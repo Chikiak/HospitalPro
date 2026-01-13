@@ -1,7 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="SGT-H API", version="0.1.0")
+from app.api.endpoints import auth
+from app.core.database import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize database on startup."""
+    await init_db()
+    yield
+
+
+app = FastAPI(title="SGT-H API", version="0.1.0", lifespan=lifespan)
 
 # Configure CORS
 origins = [
@@ -24,3 +37,6 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+# Include routers
+app.include_router(auth.router)

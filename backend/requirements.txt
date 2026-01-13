@@ -2,9 +2,17 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 psycopg2-binary
+asyncpg
 pydantic-settings
 oracledb
 pandas
 openpyxl
 weasyprint
 python-multipart
+passlib[bcrypt]
+PyJWT
+python-jose[cryptography]
+pytest
+pytest-asyncio
+httpx
+aiosqlite
