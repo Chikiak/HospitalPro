@@ -113,11 +113,11 @@ class OracleAdapter:
         # Parse comma-separated strings into lists
         allergies = []
         if data.get('allergies'):
-            allergies = [a for a in data['allergies'].split(',') if a]
+            allergies = [a for a in data['allergies'].split(',') if a and a.strip()]
         
         medications = []
         if data.get('medications'):
-            medications = [m for m in data['medications'].split(',') if m]
+            medications = [m for m in data['medications'].split(',') if m and m.strip()]
         
         # Build PatientHistory object
         return PatientHistory(
