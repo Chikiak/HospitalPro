@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.user import UserRole
 
@@ -13,11 +13,10 @@ class UserCreate(BaseModel):
 
 class UserResponse(BaseModel):
     """Schema for user response."""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     dni: str
     full_name: str
     role: UserRole
     is_active: bool
-    
-    class Config:
-        from_attributes = True

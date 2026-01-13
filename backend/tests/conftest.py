@@ -1,6 +1,7 @@
 import asyncio
 from typing import AsyncGenerator, Generator
 
+import httpx
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
@@ -61,7 +62,7 @@ async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     
     app.dependency_overrides[get_db] = override_get_db
     
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     
     app.dependency_overrides.clear()

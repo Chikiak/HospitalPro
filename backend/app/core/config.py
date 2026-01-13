@@ -1,8 +1,11 @@
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Application settings."""
+    
+    model_config = ConfigDict(env_file=".env", case_sensitive=True)
     
     # Database
     POSTGRES_USER: str = "admin"
@@ -20,10 +23,6 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         """Construct async database URL."""
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 settings = Settings()
