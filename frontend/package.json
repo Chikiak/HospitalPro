@@ -8,21 +8,39 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+<<<<<<< HEAD
     "test": "vitest"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/postcss": "^4.1.18",
+=======
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+>>>>>>> main
     "@tanstack/react-query": "^5.90.16",
     "axios": "^1.13.2",
+    "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.0",
+<<<<<<< HEAD
+=======
+    "tailwind-merge": "^3.4.0",
+>>>>>>> main
     "zod": "^4.3.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+<<<<<<< HEAD
+=======
+    "@tailwindcss/postcss": "^4.1.18",
+>>>>>>> main
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
