@@ -8,3 +8,5 @@ pandas
 openpyxl
 weasyprint
 python-multipart
+pytest
+pytest-mock
