@@ -1,0 +1,38 @@
+# General
+.DS_Store
+Thumbs.db
+*~
+*.log
+*.sqlite
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+.env.*
+!.env.example
+htmlcov/
+.coverage
+.pytest_cache/
+*.spec
+
+# Node / React
+node_modules/
+dist/
+build/
+.output/
+coverage/
+.npm/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
