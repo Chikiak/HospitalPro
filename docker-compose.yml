@@ -26,9 +26,12 @@ services:
       POSTGRES_DB: hospital_pro
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
+      # WARNING: Change this SECRET_KEY in production!
+      # Generate a secure key with: openssl rand -hex 32
       SECRET_KEY: supersecretkey
     volumes:
       - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: always
 
   frontend:

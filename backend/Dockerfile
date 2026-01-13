@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
+# Note: --trusted-host flags may be needed in some CI/CD environments with SSL certificate issues
+# In production, remove these flags to ensure proper SSL verification
 RUN pip install --no-cache-dir --user -r requirements.txt --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
 
 # Final stage
@@ -37,4 +39,4 @@ COPY . .
 EXPOSE 8000
 
 # Run the application with uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
