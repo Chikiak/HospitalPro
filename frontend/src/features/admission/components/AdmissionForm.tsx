@@ -494,7 +494,7 @@ const AdmissionFormContent: React.FC = () => {
         />
       </WizardStep>
 
-      <WizardNavigation onSave={handleSave} isLastStep={watch().medicalHistory !== undefined} className="mt-8" />
+      <WizardNavigation onSave={handleSave} className="mt-8" />
     </form>
   );
 };

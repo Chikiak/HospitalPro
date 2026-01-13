@@ -100,16 +100,15 @@ export const WizardProgressBar: React.FC<WizardProgressBarProps> = ({ className 
 
 interface WizardNavigationProps {
   onSave?: () => void;
-  isLastStep?: boolean;
   className?: string;
 }
 
 export const WizardNavigation: React.FC<WizardNavigationProps> = ({
   onSave,
-  isLastStep = false,
   className = '',
 }) => {
-  const { currentStep, goToNext, goToPrevious, canGoNext } = useWizard();
+  const { currentStep, totalSteps, goToNext, goToPrevious, canGoNext } = useWizard();
+  const isLastStep = currentStep === totalSteps - 1;
 
   return (
     <div className={`flex justify-between gap-4 ${className}`}>
