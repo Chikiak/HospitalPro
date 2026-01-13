@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 psycopg2-binary
+asyncpg
 pydantic-settings
 oracledb
 pandas
@@ -10,3 +11,10 @@ weasyprint
 python-multipart
 pytest
 pytest-mock
+passlib[bcrypt]
+PyJWT
+python-jose[cryptography]
+pytest
+pytest-asyncio
+httpx
+aiosqlite
