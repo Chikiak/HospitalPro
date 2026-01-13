@@ -1,6 +1,7 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
+alembic
 psycopg2-binary
 asyncpg
 pydantic-settings
@@ -11,11 +12,10 @@ weasyprint
 python-multipart
 pytest
 pytest-mock
+pytest-asyncio
 passlib[bcrypt]
 bcrypt==3.2.2
 PyJWT
 python-jose[cryptography]
-pytest
-pytest-asyncio
 httpx
 aiosqlite
