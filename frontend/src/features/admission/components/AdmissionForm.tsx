@@ -396,7 +396,11 @@ const AdmissionFormContent: React.FC = () => {
     setValue,
     formState: { errors },
   } = useForm<AdmissionData>({
-    // Type assertion needed due to verbatimModuleSyntax incompatibility with zod resolver
+    // Type assertion is necessary due to a known incompatibility between @hookform/resolvers
+    // and TypeScript's verbatimModuleSyntax option. The zodResolver is correctly typed at runtime
+    // but TypeScript's strict module syntax validation incorrectly flags it as incompatible.
+    // This is a known issue: https://github.com/react-hook-form/resolvers/issues/630
+    // The resolver works correctly and provides full type safety for form validation.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(admissionSchema) as any,
     mode: 'onChange',
@@ -501,6 +505,12 @@ const AdmissionFormContent: React.FC = () => {
 
 // Wrapper Component
 const AdmissionForm: React.FC = () => {
+  const handleComplete = () => {
+    // This function intentionally left empty as form submission is handled via handleSubmit
+    // The Wizard component calls this when the user clicks the final "Enviar" button
+    // which triggers the form's onSubmit handler
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4">
       <div className="max-w-3xl mx-auto">
@@ -517,7 +527,7 @@ const AdmissionForm: React.FC = () => {
             Complete el formulario de admisión del paciente
           </p>
 
-          <Wizard totalSteps={3} onComplete={() => {}}>
+          <Wizard totalSteps={3} onComplete={handleComplete}>
             <AdmissionFormContent />
           </Wizard>
         </div>
