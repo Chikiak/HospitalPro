@@ -40,14 +40,6 @@ async def register(
     """Register a new user."""
     auth_service = AuthService(db)
     
-    # Check if user already exists
-    existing_user = await auth_service.get_user_by_dni(user_data.dni)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User with this DNI already exists",
-        )
-    
     try:
         user = await auth_service.create_user(
             dni=user_data.dni,

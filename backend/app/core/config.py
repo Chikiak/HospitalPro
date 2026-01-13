@@ -7,15 +7,15 @@ class Settings(BaseSettings):
     
     model_config = ConfigDict(env_file=".env", case_sensitive=True)
     
-    # Database
-    POSTGRES_USER: str = "admin"
-    POSTGRES_PASSWORD: str = "password123"
+    # Database - No defaults for production security
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
     POSTGRES_DB: str = "hospital_pro"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     
-    # Security
-    SECRET_KEY: str = "your-secret-key-here-change-in-production"
+    # Security - Must be set via environment variable
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
