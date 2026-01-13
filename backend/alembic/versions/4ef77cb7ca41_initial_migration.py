@@ -26,7 +26,7 @@ def upgrade() -> None:
     sa.Column('dni', sa.String(length=20), nullable=False),
     sa.Column('hashed_password', sa.String(length=255), nullable=False),
     sa.Column('full_name', sa.String(length=255), nullable=False),
-    sa.Column('role', sa.Enum('PATIENT', 'DOCTOR', 'ADMIN', name='userrole'), nullable=False),
+    sa.Column('role', sa.Enum('patient', 'doctor', 'admin', name='userrole'), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
