@@ -20,6 +20,83 @@ Se ha seleccionado un stack moderno, robusto y escalable, priorizando la segurid
 *   **Estilos:** Tailwind CSS (Diseño limpio y adaptativo).
 *   **Gestión de Estado:** TanStack Query.
 
+### Contenedorización
+*   **Docker:** Multi-stage builds para backend y frontend
+*   **Docker Compose:** Orquestación de servicios (PostgreSQL, backend, frontend)
+
+---
+
+## 🐳 Instalación y Ejecución con Docker
+
+El proyecto está completamente containerizado usando Docker y Docker Compose.
+
+### Prerrequisitos
+- Docker (versión 20.10 o superior)
+- Docker Compose (versión 2.0 o superior)
+
+### Inicio Rápido
+
+1. **Clonar el repositorio:**
+```bash
+git clone https://github.com/Chikiak/HospitalPro.git
+cd HospitalPro
+```
+
+2. **(Opcional) Configurar variables de entorno:**
+```bash
+cp .env.docker.example .env
+# Editar .env y cambiar SECRET_KEY y credenciales
+```
+
+3. **Iniciar todos los servicios:**
+```bash
+docker compose up -d
+```
+
+4. **Acceder a las aplicaciones:**
+- Backend API: http://localhost:8000
+- API Docs (Swagger): http://localhost:8000/docs
+- Frontend: http://localhost:5173
+
+### Comandos Útiles
+
+```bash
+# Ver logs de todos los servicios
+docker compose logs -f
+
+# Ver logs de un servicio específico
+docker compose logs -f backend
+
+# Detener todos los servicios
+docker compose down
+
+# Reconstruir imágenes
+docker compose build
+
+# Reiniciar un servicio
+docker compose restart backend
+```
+
+### Desarrollo
+
+El proyecto incluye hot reload para desarrollo:
+- **Backend**: Los cambios en el código Python se recargan automáticamente
+- **Frontend**: Vite reconstruye automáticamente los cambios
+
+### Variables de Entorno
+
+Las siguientes variables se pueden configurar mediante un archivo `.env`:
+
+- `POSTGRES_USER`: Usuario de PostgreSQL (default: admin)
+- `POSTGRES_PASSWORD`: Contraseña de PostgreSQL (default: password123)
+- `POSTGRES_DB`: Nombre de la base de datos (default: hospital_pro)
+- `SECRET_KEY`: Clave secreta para JWT (**CAMBIAR en producción**)
+
+**⚠️ Importante**: Generar una clave secreta segura para producción:
+```bash
+openssl rand -hex 32
+```
+
 ---
 
 ## 📋 Funcionalidades y Flujos de Trabajo
