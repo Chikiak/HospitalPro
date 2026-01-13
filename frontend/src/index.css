@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Primary Color - Teal */
+    --color-primary: 15 118 110; /* teal-700 */
+    --color-primary-hover: 13 148 136; /* teal-600 */
+    --color-primary-active: 20 184 166; /* teal-500 */
+    
+    /* Background Colors */
+    --color-background: 248 250 252; /* slate-50 */
+    --color-surface: 255 255 255; /* white */
+    
+    /* Text Colors */
+    --color-text-primary: 15 23 42; /* slate-900 */
+    --color-text-secondary: 71 85 105; /* slate-600 */
+    --color-text-muted: 148 163 184; /* slate-400 */
+    
+    /* Border Colors */
+    --color-border: 226 232 240; /* slate-200 */
+    --color-border-focus: 15 118 110; /* teal-700 */
+    
+    /* Error Colors */
+    --color-error: 220 38 38; /* red-600 */
+    --color-error-light: 254 226 226; /* red-100 */
+  }
+}
