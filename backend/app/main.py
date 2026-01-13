@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.endpoints import auth
+
 app = FastAPI(title="SGT-H API", version="0.1.0")
 
 # Configure CORS
@@ -24,3 +26,6 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+# Include routers
+app.include_router(auth.router)
