@@ -54,8 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     return null
   })
+  const [isLoading, setIsLoading] = useState(false)
   
   const login = async (dni: string, password: string) => {
+    setIsLoading(true)
     try {
       const response = await api.post('/auth/login/access-token', {
         dni,
@@ -67,13 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Store token
       localStorage.setItem('access_token', access_token)
 
-      // Fetch user profile (we need to decode token or fetch user info)
-      // For now, we'll create a basic user object from the login response
-      // In a real scenario, you might want to fetch the user profile from a separate endpoint
+      // TODO: Ideally, the backend should return user profile in login response
+      // or provide a /me endpoint to fetch user info after login.
+      // For now, we create a minimal user object with available data.
       const userProfile: User = {
-        id: 0, // This should come from backend
+        id: 0,
         dni,
-        full_name: 'User', // This should come from backend
+        full_name: 'User',
         role: 'patient',
         is_active: true,
       }
@@ -83,10 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Login error:', error)
       throw error
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const register = async (data: RegisterData) => {
+    setIsLoading(true)
     try {
       await api.post('/auth/users/register', {
         dni: data.dni,
@@ -100,6 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Registration error:', error)
       throw error
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -112,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     user,
     isAuthenticated: !!user,
-    isLoading: false,
+    isLoading,
     login,
     register,
     logout,

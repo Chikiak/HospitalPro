@@ -30,10 +30,8 @@ api.interceptors.response.use(
       // Clear token on 401 unauthorized
       localStorage.removeItem('access_token')
       localStorage.removeItem('user')
-      // Optionally redirect to login
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-      }
+      // Note: The app's routing logic will handle redirecting to login
+      // when it detects no authentication
     }
     return Promise.reject(error)
   }
