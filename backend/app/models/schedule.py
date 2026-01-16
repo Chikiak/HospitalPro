@@ -1,7 +1,7 @@
 import enum
 from datetime import time
 
-from sqlalchemy import Enum, ForeignKey, Integer, String, Time
+from sqlalchemy import ForeignKey, Integer, String, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -24,7 +24,7 @@ class DoctorAvailability(Base):
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     doctor_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    day_of_week: Mapped[DayOfWeek] = mapped_column(Enum(DayOfWeek), nullable=False)
+    day_of_week: Mapped[DayOfWeek] = mapped_column(Integer, nullable=False)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
     specialty: Mapped[str] = mapped_column(String(100), nullable=True)

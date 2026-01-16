@@ -18,17 +18,6 @@ from app.schemas.appointment import (
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
 
-async def get_current_user(db: AsyncSession) -> User:
-    """
-    Placeholder for getting the current authenticated user.
-    In a real implementation, this would extract the user from the JWT token.
-    For now, we'll just return a mock patient user.
-    """
-    # TODO: Implement proper authentication
-    # This is a simplified version - in production, use proper JWT validation
-    return None
-
-
 @router.get("/available", response_model=List[AvailableSlot])
 async def get_available_appointments(
     specialty: str = Query(..., description="Medical specialty to filter by"),
@@ -143,9 +132,15 @@ async def book_appointment(
     2. Checks that the slot is still available
     3. Creates the appointment
     
-    Note: In production, this should also:
-    - Authenticate the user and use their patient_id
-    - Validate that the user is a patient
+    SECURITY WARNING: This endpoint currently uses a hardcoded patient_id for testing.
+    In production, this MUST be replaced with proper JWT authentication to get the
+    actual patient_id from the authenticated user. Otherwise, any user could book
+    appointments for any patient.
+    
+    Production requirements:
+    - Implement JWT authentication dependency
+    - Validate that the authenticated user is a patient
+    - Use the authenticated user's ID as patient_id
     - Send confirmation notifications
     """
     # Verify doctor exists and is active
@@ -185,10 +180,15 @@ async def book_appointment(
             detail="This appointment slot is no longer available"
         )
     
-    # TODO: Get actual patient_id from authenticated user
-    # For now, we'll use a placeholder patient ID
-    # In production, this would come from the JWT token
-    patient_id = 1  # Placeholder - should come from authenticated user
+    # SECURITY NOTE: This is a placeholder for patient_id
+    # In production, this MUST be replaced with the authenticated user's ID
+    # obtained from the JWT token via a proper dependency like:
+    # current_user: User = Depends(get_current_user)
+    # patient_id = current_user.id
+    # 
+    # TODO: Implement proper JWT authentication and replace this hardcoded value
+    # This hardcoded value is only for testing purposes and creates a security vulnerability
+    patient_id = 1  # SECURITY: Replace with authenticated user ID in production
     
     # Create the appointment
     new_appointment = Appointment(

@@ -55,7 +55,7 @@ def upgrade() -> None:
     op.create_table('doctor_availability',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('doctor_id', sa.Integer(), nullable=False),
-        sa.Column('day_of_week', sa.Enum('0', '1', '2', '3', '4', '5', '6', name='dayofweek'), nullable=False),
+        sa.Column('day_of_week', sa.Integer(), nullable=False),
         sa.Column('start_time', sa.Time(), nullable=False),
         sa.Column('end_time', sa.Time(), nullable=False),
         sa.Column('specialty', sa.String(length=100), nullable=True),
