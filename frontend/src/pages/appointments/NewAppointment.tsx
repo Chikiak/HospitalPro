@@ -54,7 +54,7 @@ export default function NewAppointment() {
         return MOCK_TURNS
       }
     },
-    enabled: !!selectedSpecialty && step === 2,
+    enabled: !!selectedSpecialty?.id && step === 2,
   })
 
   const handleSpecialtySelect = (specialty: Specialty) => {
