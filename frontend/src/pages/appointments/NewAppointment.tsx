@@ -42,7 +42,12 @@ export default function NewAppointment() {
     queryFn: async () => {
       try {
         const response = await axios.get(`/api/appointments/available?specialty=${selectedSpecialty?.id}`)
-        return response.data
+        // Ensure we always return an array
+        if (Array.isArray(response.data)) {
+          return response.data
+        }
+        console.warn('API returned non-array data, using mock data')
+        return MOCK_TURNS
       } catch (error) {
         // Fallback to mock data if API fails
         console.warn('API not available, using mock data:', error)
@@ -172,6 +177,10 @@ export default function NewAppointment() {
             {turnsLoading ? (
               <div className="text-center py-8">
                 <p className="text-slate-600">Cargando turnos disponibles...</p>
+              </div>
+            ) : !Array.isArray(turns) || turns.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-600">No hay turnos disponibles</p>
               </div>
             ) : (
               <div className="space-y-3">

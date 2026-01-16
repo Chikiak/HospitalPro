@@ -47,7 +47,12 @@ export default function Dashboard() {
     queryFn: async () => {
       try {
         const response = await axios.get('/api/appointments/me')
-        return response.data
+        // Ensure we always return an array
+        if (Array.isArray(response.data)) {
+          return response.data
+        }
+        console.warn('API returned non-array data, using mock data')
+        return MOCK_APPOINTMENTS
       } catch (error) {
         // Fallback to mock data if API fails
         console.warn('API not available, using mock data:', error)
@@ -176,7 +181,7 @@ export default function Dashboard() {
             <div className="text-center py-8">
               <p className="text-red-600">Error al cargar los turnos</p>
             </div>
-          ) : appointments.length === 0 ? (
+          ) : !Array.isArray(appointments) || appointments.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-slate-600">No hay turnos programados</p>
             </div>
