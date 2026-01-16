@@ -1,6 +1,95 @@
 import { Users, Calendar, Clock, TrendingUp } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import axios from 'axios'
+
+// Types
+interface Appointment {
+  id: string
+  patient_name: string
+  specialty: string
+  doctor_name: string
+  date: string
+  status: 'confirmed' | 'pending' | 'completed'
+}
+
+// Mock data for fallback
+const MOCK_APPOINTMENTS: Appointment[] = [
+  {
+    id: '1',
+    patient_name: 'Juan Pérez',
+    specialty: 'Consulta General',
+    doctor_name: 'Dr. García',
+    date: '2026-01-16T10:30:00',
+    status: 'confirmed',
+  },
+  {
+    id: '2',
+    patient_name: 'María González',
+    specialty: 'Cardiología',
+    doctor_name: 'Dra. Rodríguez',
+    date: '2026-01-16T11:00:00',
+    status: 'pending',
+  },
+  {
+    id: '3',
+    patient_name: 'Carlos Martínez',
+    specialty: 'Traumatología',
+    doctor_name: 'Dr. López',
+    date: '2026-01-16T11:30:00',
+    status: 'confirmed',
+  },
+]
 
 export default function Dashboard() {
+  // Fetch user's appointments
+  const { data: appointments = MOCK_APPOINTMENTS, isLoading, error } = useQuery<Appointment[]>({
+    queryKey: ['appointments', 'me'],
+    queryFn: async () => {
+      try {
+        const response = await axios.get('/api/appointments/me')
+        return response.data
+      } catch (error) {
+        // Fallback to mock data if API fails
+        console.warn('API not available, using mock data:', error)
+        return MOCK_APPOINTMENTS
+      }
+    },
+  })
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
+    return new Intl.DateTimeFormat('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date)
+  }
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return 'bg-green-100 text-green-700'
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-700'
+      case 'completed':
+        return 'bg-blue-100 text-blue-700'
+      default:
+        return 'bg-slate-100 text-slate-700'
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return 'Confirmado'
+      case 'pending':
+        return 'Pendiente'
+      case 'completed':
+        return 'Completado'
+      default:
+        return status
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -79,44 +168,47 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold text-slate-900">Próximos Turnos</h2>
         </div>
         <div className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between py-3 border-b border-slate-100">
-              <div>
-                <p className="font-medium text-slate-900">Juan Pérez</p>
-                <p className="text-sm text-slate-600">Consulta General - Dr. García</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-slate-900">10:30 AM</p>
-                <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
-                  Confirmado
-                </span>
-              </div>
+          {isLoading ? (
+            <div className="text-center py-8">
+              <p className="text-slate-600">Cargando turnos...</p>
             </div>
-            <div className="flex items-center justify-between py-3 border-b border-slate-100">
-              <div>
-                <p className="font-medium text-slate-900">María González</p>
-                <p className="text-sm text-slate-600">Cardiología - Dra. Rodríguez</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-slate-900">11:00 AM</p>
-                <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">
-                  Pendiente
-                </span>
-              </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-red-600">Error al cargar los turnos</p>
             </div>
-            <div className="flex items-center justify-between py-3">
-              <div>
-                <p className="font-medium text-slate-900">Carlos Martínez</p>
-                <p className="text-sm text-slate-600">Traumatología - Dr. López</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-slate-900">11:30 AM</p>
-                <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
-                  Confirmado
-                </span>
-              </div>
+          ) : appointments.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-slate-600">No hay turnos programados</p>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              {appointments.map((appointment, index) => (
+                <div
+                  key={appointment.id}
+                  className={`flex items-center justify-between py-3 ${
+                    index < appointments.length - 1 ? 'border-b border-slate-100' : ''
+                  }`}
+                >
+                  <div>
+                    <p className="font-medium text-slate-900">{appointment.patient_name}</p>
+                    <p className="text-sm text-slate-600">
+                      {appointment.specialty} - {appointment.doctor_name}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-slate-900">{formatTime(appointment.date)}</p>
+                    <span
+                      className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusBadgeClass(
+                        appointment.status
+                      )}`}
+                    >
+                      {getStatusText(appointment.status)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

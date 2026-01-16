@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import NewAppointment from './pages/appointments/NewAppointment'
 import MainLayout from './layouts/MainLayout'
 
 function App() {
@@ -13,6 +14,14 @@ function App() {
           element={
             <MainLayout>
               <Dashboard />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/appointments/new"
+          element={
+            <MainLayout>
+              <NewAppointment />
             </MainLayout>
           }
         />
