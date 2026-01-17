@@ -15,6 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Import Base and models
 from app.core.database import Base
 from app.models.user import User  # Import required to register User model with SQLAlchemy metadata
+from app.models.patient import TriageData  # Import TriageData model
+from app.models.appointment import Appointment  # Import Appointment model
+from app.models.schedule import DoctorAvailability  # Import DoctorAvailability model
 from app.core.config import settings
 
 # this is the Alembic Config object, which provides
