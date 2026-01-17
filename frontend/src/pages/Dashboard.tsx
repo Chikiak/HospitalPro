@@ -1,6 +1,6 @@
 import { Users, Calendar, Clock, TrendingUp } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
+import api from '../lib/axios'
 
 // Types
 interface Appointment {
@@ -46,7 +46,7 @@ export default function Dashboard() {
     queryKey: ['appointments', 'me'],
     queryFn: async () => {
       try {
-        const response = await axios.get('/api/appointments/me')
+        const response = await api.get('/appointments/me')
         // Ensure we always return an array
         if (Array.isArray(response.data)) {
           return response.data
@@ -190,9 +190,8 @@ export default function Dashboard() {
               {appointments.map((appointment, index) => (
                 <div
                   key={appointment.id}
-                  className={`flex items-center justify-between py-3 ${
-                    index < appointments.length - 1 ? 'border-b border-slate-100' : ''
-                  }`}
+                  className={`flex items-center justify-between py-3 ${index < appointments.length - 1 ? 'border-b border-slate-100' : ''
+                    }`}
                 >
                   <div>
                     <p className="font-medium text-slate-900">{appointment.patient_name}</p>

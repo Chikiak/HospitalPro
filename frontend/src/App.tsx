@@ -7,28 +7,6 @@ import MainLayout from './layouts/MainLayout'
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/"
-          element={
-            <MainLayout>
-              <Dashboard />
-            </MainLayout>
-          }
-        />
-        <Route
-          path="/appointments/new"
-          element={
-            <MainLayout>
-              <NewAppointment />
-            </MainLayout>
-          }
-        />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -38,6 +16,14 @@ function App() {
             element={
               <MainLayout>
                 <Dashboard />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/appointments/new"
+            element={
+              <MainLayout>
+                <NewAppointment />
               </MainLayout>
             }
           />

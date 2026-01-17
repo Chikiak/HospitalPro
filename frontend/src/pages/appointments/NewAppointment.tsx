@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
+import api from '../../lib/axios'
 import Button from '../../components/ui/Button'
 import { Calendar, Check, ChevronLeft, Clock, User } from 'lucide-react'
 
@@ -41,7 +41,7 @@ export default function NewAppointment() {
     queryKey: ['turns', selectedSpecialty?.id],
     queryFn: async () => {
       try {
-        const response = await axios.get(`/api/appointments/available?specialty=${selectedSpecialty?.id}`)
+        const response = await api.get(`/appointments/available?specialty=${selectedSpecialty?.id}`)
         // Ensure we always return an array
         if (Array.isArray(response.data)) {
           return response.data
@@ -69,7 +69,7 @@ export default function NewAppointment() {
 
   const handleConfirmBooking = async () => {
     try {
-      await axios.post('/api/appointments', {
+      await api.post('/appointments/book', {
         specialty_id: selectedSpecialty?.id,
         turn_id: selectedTurn?.id,
       })
