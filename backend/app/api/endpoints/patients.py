@@ -23,8 +23,10 @@ async def update_medical_history(
     This endpoint updates the medical_history field in the triage_data table.
     If no triage data exists for the patient, it creates a new record.
     
-    Note: In production, this should verify the authenticated user matches patient_id
-    or has appropriate permissions to update this patient's data.
+    SECURITY TODO: Add authentication middleware to verify:
+    - The authenticated user's ID matches patient_id, OR
+    - The authenticated user has appropriate role (doctor, admin, staff)
+    This prevents unauthorized access to patient medical records.
     """
     # Verify patient exists
     user_repo = UserRepository(db)
@@ -67,8 +69,10 @@ async def get_medical_history(
     
     Returns the patient's triage data including medical history and allergies.
     
-    Note: In production, this should verify the authenticated user matches patient_id
-    or has appropriate permissions to view this patient's data.
+    SECURITY TODO: Add authentication middleware to verify:
+    - The authenticated user's ID matches patient_id, OR
+    - The authenticated user has appropriate role (doctor, admin, staff)
+    This prevents unauthorized access to patient medical records.
     """
     # Verify patient exists
     user_repo = UserRepository(db)

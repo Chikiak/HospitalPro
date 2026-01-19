@@ -127,8 +127,19 @@ export default function RegisterStep2() {
         return
       }
 
-      const user = JSON.parse(userStr)
-      const userId = user.id
+      let user
+      try {
+        user = JSON.parse(userStr)
+      } catch (e) {
+        setError('Error al leer información del usuario. Por favor, inicie sesión nuevamente.')
+        return
+      }
+
+      const userId = user?.id
+      if (!userId) {
+        setError('No se encontró el ID del usuario. Por favor, inicie sesión nuevamente.')
+        return
+      }
 
       // Send PUT/PATCH request to update medical history
       // Note: This endpoint needs to be created in the backend
