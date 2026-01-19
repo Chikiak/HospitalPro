@@ -53,6 +53,40 @@ function App() {
             }
           />
 
+          {/* Private routes - Staff only (admin, doctor, staff roles) */}
+          <Route
+            path="/admin/*"
+            element={
+              <RoleGuard allowedRoles={['admin', 'doctor', 'staff']}>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/staff/*"
+            element={
+              <RoleGuard allowedRoles={['admin', 'doctor', 'staff']}>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* Private route - Any authenticated user can access profile */}
+          <Route
+            path="/profile"
+            element={
+              <AuthGuard>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
+              </AuthGuard>
+            }
+          />
+
           {/* Catch-all route */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
