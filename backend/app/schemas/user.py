@@ -20,3 +20,8 @@ class UserResponse(BaseModel):
     full_name: str
     role: UserRole
     is_active: bool
+
+
+class StaffLoginRequest(BaseModel):
+    """Schema for staff login request."""
+    password: str = Field(..., min_length=6, description="Password")
