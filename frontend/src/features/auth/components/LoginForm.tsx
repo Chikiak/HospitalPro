@@ -3,13 +3,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Input from '../../../components/ui/Input'
 import Button from '../../../components/ui/Button'
+import { DNI_PATTERN, DNI_VALIDATION, PASSWORD_VALIDATION } from '../../../lib/validation'
 
 const loginSchema = z.object({
   dni: z
     .string()
-    .min(1, 'El DNI es requerido')
-    .regex(/^\d{11}$/, 'El DNI debe tener exactamente 11 dígitos'),
-  password: z.string().min(1, 'La contraseña es requerida'),
+    .min(1, DNI_VALIDATION.required)
+    .regex(DNI_PATTERN, DNI_VALIDATION.format),
+  password: z.string().min(1, PASSWORD_VALIDATION.required),
 })
 
 type LoginFormData = z.infer<typeof loginSchema>

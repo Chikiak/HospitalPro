@@ -10,18 +10,19 @@ import Tabs from '../components/ui/Tabs'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import Alert from '../components/ui/Alert'
+import { DNI_PATTERN, DNI_VALIDATION, PASSWORD_VALIDATION } from '../lib/validation'
 
 // Schemas for validation
 const patientLoginSchema = z.object({
   dni: z
     .string()
-    .min(1, 'El DNI es requerido')
-    .regex(/^\d{11}$/, 'El DNI debe tener exactamente 11 dígitos'),
-  password: z.string().min(1, 'La contraseña es requerida'),
+    .min(1, DNI_VALIDATION.required)
+    .regex(DNI_PATTERN, DNI_VALIDATION.format),
+  password: z.string().min(1, PASSWORD_VALIDATION.required),
 })
 
 const staffLoginSchema = z.object({
-  password: z.string().min(1, 'La contraseña es requerida'),
+  password: z.string().min(1, PASSWORD_VALIDATION.required),
 })
 
 type PatientLoginData = z.infer<typeof patientLoginSchema>
