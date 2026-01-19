@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.repositories.triage_repository import TriageRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.patient import TriageDataResponse, TriageDataUpdate
+from app.schemas.patient import PatientExportData, TriageDataResponse, TriageDataUpdate
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -94,3 +94,46 @@ async def get_medical_history(
         )
     
     return TriageDataResponse.model_validate(triage_data)
+
+
+@router.get("/", response_model=list[PatientExportData])
+async def list_all_patients(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[PatientExportData]:
+    """
+    List all patients with their medical data for export.
+    
+    Returns all patients with their basic information and triage data.
+    This endpoint is intended for staff to export patient data to Excel.
+    
+    SECURITY TODO: Add authentication middleware to verify:
+    - The authenticated user has role staff, admin, or doctor
+    This prevents unauthorized access to all patient records.
+    """
+    # Get all patients
+    user_repo = UserRepository(db)
+    patients = await user_repo.get_all_patients()
+    
+    # Get all triage data
+    triage_repo = TriageRepository(db)
+    all_triage = await triage_repo.get_all()
+    
+    # Create a map of patient_id -> triage data for quick lookup
+    triage_map = {triage.patient_id: triage for triage in all_triage}
+    
+    # Build response combining user and triage data
+    result = []
+    for patient in patients:
+        triage = triage_map.get(patient.id)
+        result.append(
+            PatientExportData(
+                id=patient.id,
+                dni=patient.dni,
+                full_name=patient.full_name,
+                is_active=patient.is_active,
+                medical_history=triage.medical_history if triage else None,
+                allergies=triage.allergies if triage else None,
+            )
+        )
+    
+    return result

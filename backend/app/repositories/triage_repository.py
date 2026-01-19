@@ -51,3 +51,10 @@ class TriageRepository:
         await self.session.commit()
         await self.session.refresh(triage_data)
         return triage_data
+    
+    async def get_all(self) -> list[TriageData]:
+        """Get all triage data."""
+        result = await self.session.execute(
+            select(TriageData).order_by(TriageData.patient_id)
+        )
+        return list(result.scalars().all())
