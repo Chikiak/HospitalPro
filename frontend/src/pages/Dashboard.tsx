@@ -1,6 +1,7 @@
 import { Calendar } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
 import api from '../lib/api'
 import Button from '../components/ui/Button'
 import { useAuth } from '../context/AuthContext'
@@ -33,10 +34,12 @@ export default function Dashboard() {
   })
 
   // Filter to show only future appointments
-  const futureAppointments = appointments.filter(appointment => {
-    const appointmentDate = new Date(appointment.date)
-    return appointmentDate > new Date()
-  })
+  const futureAppointments = useMemo(() => {
+    return appointments.filter(appointment => {
+      const appointmentDate = new Date(appointment.date)
+      return appointmentDate > new Date()
+    })
+  }, [appointments])
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
@@ -202,7 +205,7 @@ export default function Dashboard() {
                 >
                   <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                      {appointment.patient_name[0]}
+                      {appointment.patient_name?.[0] || '?'}
                     </div>
                     <div>
                       <p className="font-bold text-slate-900 group-hover:text-primary transition-colors">{appointment.patient_name}</p>
