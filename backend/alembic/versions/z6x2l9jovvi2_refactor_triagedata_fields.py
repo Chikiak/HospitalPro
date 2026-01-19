@@ -24,6 +24,22 @@ def upgrade() -> None:
     # Add last_updated column with default value (UTC timestamp)
     op.add_column('triage_data', sa.Column('last_updated', sa.DateTime(), nullable=False, server_default=sa.text("timezone('UTC', now())")))
     
+    # Create a trigger to automatically update last_updated on row modifications
+    op.execute("""
+        CREATE OR REPLACE FUNCTION update_triage_data_last_updated()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.last_updated = timezone('UTC', now());
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        
+        CREATE TRIGGER triage_data_last_updated_trigger
+        BEFORE UPDATE ON triage_data
+        FOR EACH ROW
+        EXECUTE FUNCTION update_triage_data_last_updated();
+    """)
+    
     # Change medical_history from Text to JSON
     # First, we need to handle existing data - convert text to JSON format
     # For PostgreSQL, we can use ALTER COLUMN with USING clause
@@ -48,6 +64,12 @@ def downgrade() -> None:
             WHEN medical_history IS NULL THEN NULL
             ELSE medical_history::TEXT
         END
+    """)
+    
+    # Drop the trigger and function
+    op.execute("""
+        DROP TRIGGER IF EXISTS triage_data_last_updated_trigger ON triage_data;
+        DROP FUNCTION IF EXISTS update_triage_data_last_updated();
     """)
     
     # Remove last_updated column
