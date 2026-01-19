@@ -141,7 +141,7 @@ export default function Dashboard() {
               <span className="flex items-center text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
                 <TrendingUp className="h-3 w-3 mr-1" /> +12%
               </span>
-              <span className="text-xs text-slate-400 font-medium tracking-tight">vs mes pasado</span>
+              <span className="text-xs text-slate-400 font-medium tracking-tight">vs el mes pasado</span>
             </div>
           </div>
         ))}
@@ -192,7 +192,9 @@ export default function Dashboard() {
                         appointment.status
                       )}`}
                     >
-                      {appointment.status}
+                      {appointment.status === 'confirmed' ? 'Confirmado' :
+                        appointment.status === 'pending' ? 'Pendiente' :
+                          appointment.status === 'completed' ? 'Completado' : appointment.status}
                     </span>
                   </div>
                 </div>

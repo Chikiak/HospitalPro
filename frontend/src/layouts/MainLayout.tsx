@@ -11,7 +11,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation()
 
   const navItems = [
-    { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
+    { label: 'Inicio', icon: LayoutDashboard, path: '/' },
     { label: 'Pacientes', icon: Users, path: '/patients' },
     { label: 'Turnos', icon: Calendar, path: '/appointments/new' },
     { label: 'Configuración', icon: Settings, path: '/settings' },
@@ -29,7 +29,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
             <div>
               <h1 className="text-xl font-black text-white uppercase tracking-tighter">HospitalPro</h1>
-              <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest leading-none">Management v2.0</span>
+              <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest leading-none">Gestión v2.0</span>
             </div>
           </div>
         </div>
@@ -98,7 +98,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <div className="flex items-center gap-4 pl-6 border-l border-slate-200">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-black text-slate-900 leading-none">Dr. Adrian G.</p>
-                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">Admin Principal</p>
+                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">Administrador</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-primary text-white flex items-center justify-center font-black shadow-lg shadow-primary/20 cursor-pointer transition-transform hover:scale-110 active:scale-95">
                   AG

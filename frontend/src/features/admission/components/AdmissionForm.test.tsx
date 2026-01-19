@@ -8,13 +8,13 @@ describe('AdmissionForm', () => {
     // Clear localStorage before each test
     localStorage.clear();
     // Mock console methods
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => { });
+    vi.spyOn(console, 'error').mockImplementation(() => { });
   });
 
   it('renders the form with initial step', () => {
     render(<AdmissionForm />);
-    
+
     expect(screen.getByText('Triaje Digital')).toBeInTheDocument();
     expect(screen.getByText('Identificación del Paciente')).toBeInTheDocument();
     expect(screen.getByLabelText(/DNI/i)).toBeInTheDocument();
@@ -22,16 +22,16 @@ describe('AdmissionForm', () => {
 
   it('shows progress bar with correct initial state', () => {
     render(<AdmissionForm />);
-    
+
     expect(screen.getByText('Paso 1 de 3')).toBeInTheDocument();
   });
 
   describe('Step Navigation', () => {
     it('has "Next" button disabled when identification step is invalid', async () => {
       render(<AdmissionForm />);
-      
+
       const nextButton = screen.getByRole('button', { name: /Siguiente/i });
-      
+
       // Initially, the button should be disabled (empty form)
       expect(nextButton).toBeDisabled();
     });
@@ -39,16 +39,16 @@ describe('AdmissionForm', () => {
     it('enables "Next" button when identification step is valid', async () => {
       const user = userEvent.setup();
       render(<AdmissionForm />);
-      
+
       const nextButton = screen.getByRole('button', { name: /Siguiente/i });
-      
+
       // Fill in all required fields
-      await user.type(screen.getByLabelText(/DNI/i), '12345678');
+      await user.type(screen.getByLabelText(/DNI/i), '12345678901');
       await user.type(screen.getByLabelText(/Nombre/i), 'Juan');
       await user.type(screen.getByLabelText(/Apellido/i), 'Pérez');
       await user.type(screen.getByLabelText(/Fecha de Nacimiento/i), '1990-01-01');
       await user.type(screen.getByLabelText(/Teléfono de Contacto/i), '1234567890');
-      
+
       // Wait for validation to complete
       await waitFor(() => {
         expect(nextButton).not.toBeDisabled();
@@ -58,23 +58,23 @@ describe('AdmissionForm', () => {
     it('navigates to second step when "Next" is clicked', async () => {
       const user = userEvent.setup();
       render(<AdmissionForm />);
-      
+
       // Fill in identification step
-      await user.type(screen.getByLabelText(/DNI/i), '12345678');
+      await user.type(screen.getByLabelText(/DNI/i), '12345678901');
       await user.type(screen.getByLabelText(/Nombre/i), 'Juan');
       await user.type(screen.getByLabelText(/Apellido/i), 'Pérez');
       await user.type(screen.getByLabelText(/Fecha de Nacimiento/i), '1990-01-01');
       await user.type(screen.getByLabelText(/Teléfono de Contacto/i), '1234567890');
-      
+
       // Wait for "Next" button to be enabled
       const nextButton = screen.getByRole('button', { name: /Siguiente/i });
       await waitFor(() => {
         expect(nextButton).not.toBeDisabled();
       });
-      
+
       // Click next
       await user.click(nextButton);
-      
+
       // Should now be on step 2
       await waitFor(() => {
         expect(screen.getByText('Signos Vitales')).toBeInTheDocument();
@@ -85,26 +85,26 @@ describe('AdmissionForm', () => {
     it('can navigate back to previous step', async () => {
       const user = userEvent.setup();
       render(<AdmissionForm />);
-      
+
       // Navigate to step 2
-      await user.type(screen.getByLabelText(/DNI/i), '12345678');
+      await user.type(screen.getByLabelText(/DNI/i), '12345678901');
       await user.type(screen.getByLabelText(/Nombre/i), 'Juan');
       await user.type(screen.getByLabelText(/Apellido/i), 'Pérez');
       await user.type(screen.getByLabelText(/Fecha de Nacimiento/i), '1990-01-01');
       await user.type(screen.getByLabelText(/Teléfono de Contacto/i), '1234567890');
-      
+
       const nextButton = screen.getByRole('button', { name: /Siguiente/i });
       await waitFor(() => expect(nextButton).not.toBeDisabled());
       await user.click(nextButton);
-      
+
       await waitFor(() => {
         expect(screen.getByText('Signos Vitales')).toBeInTheDocument();
       });
-      
+
       // Click previous
       const previousButton = screen.getByRole('button', { name: /Anterior/i });
       await user.click(previousButton);
-      
+
       // Should be back on step 1
       await waitFor(() => {
         expect(screen.getByText('Identificación del Paciente')).toBeInTheDocument();
@@ -116,18 +116,18 @@ describe('AdmissionForm', () => {
     it('saves form data to localStorage when fields change', async () => {
       const user = userEvent.setup();
       render(<AdmissionForm />);
-      
+
       // Fill in a field
-      await user.type(screen.getByLabelText(/DNI/i), '12345678');
-      
+      await user.type(screen.getByLabelText(/DNI/i), '12345678901');
+
       // Wait for auto-save
       await waitFor(() => {
         const savedData = localStorage.getItem('admission_form_draft');
         expect(savedData).toBeTruthy();
-        
+
         if (savedData) {
           const parsed = JSON.parse(savedData);
-          expect(parsed.identification.dni).toBe('12345678');
+          expect(parsed.identification.dni).toBe('12345678901');
         }
       }, { timeout: 1000 });
     });
@@ -136,7 +136,7 @@ describe('AdmissionForm', () => {
       // Pre-populate localStorage
       const mockData = {
         identification: {
-          dni: '87654321',
+          dni: '12345678901',
           firstName: 'Maria',
           lastName: 'Garcia',
           dateOfBirth: '1985-05-15',
@@ -158,21 +158,21 @@ describe('AdmissionForm', () => {
           emergencyContact: '',
         },
       };
-      
+
       localStorage.setItem('admission_form_draft', JSON.stringify(mockData));
-      
+
       // Render the form
       render(<AdmissionForm />);
-      
+
       // Wait for restoration
       await waitFor(() => {
         const dniInput = screen.getByLabelText(/DNI/i) as HTMLInputElement;
-        expect(dniInput.value).toBe('87654321');
+        expect(dniInput.value).toBe('12345678901');
       });
-      
+
       const firstNameInput = screen.getByLabelText(/Nombre/i) as HTMLInputElement;
       expect(firstNameInput.value).toBe('Maria');
-      
+
       const lastNameInput = screen.getByLabelText(/Apellido/i) as HTMLInputElement;
       expect(lastNameInput.value).toBe('Garcia');
     });

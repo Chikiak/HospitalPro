@@ -6,7 +6,7 @@ import LoginForm from './LoginForm'
 describe('LoginForm', () => {
   it('renders form fields correctly', () => {
     render(<LoginForm />)
-    
+
     expect(screen.getByLabelText(/dni/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /iniciar sesión/i })).toBeInTheDocument()
@@ -15,10 +15,10 @@ describe('LoginForm', () => {
   it('shows validation errors when submitting empty form', async () => {
     const user = userEvent.setup()
     render(<LoginForm />)
-    
+
     const submitButton = screen.getByRole('button', { name: /iniciar sesión/i })
     await user.click(submitButton)
-    
+
     await waitFor(() => {
       expect(screen.getByText(/el dni es requerido/i)).toBeInTheDocument()
       expect(screen.getByText(/la contraseña es requerida/i)).toBeInTheDocument()
@@ -28,74 +28,67 @@ describe('LoginForm', () => {
   it('shows validation error for invalid DNI format', async () => {
     const user = userEvent.setup()
     render(<LoginForm />)
-    
+
     const dniInput = screen.getByLabelText(/dni/i)
     await user.type(dniInput, 'abc123')
-    
+
     const submitButton = screen.getByRole('button', { name: /iniciar sesión/i })
     await user.click(submitButton)
-    
+
     await waitFor(() => {
-      expect(screen.getByText(/el dni debe ser numérico y tener 7-8 dígitos/i)).toBeInTheDocument()
+      expect(screen.getByText(/el dni debe tener exactamente 11 dígitos/i)).toBeInTheDocument()
     })
   })
 
   it('shows validation error for DNI with less than 7 digits', async () => {
     const user = userEvent.setup()
     render(<LoginForm />)
-    
+
     const dniInput = screen.getByLabelText(/dni/i)
     await user.type(dniInput, '123456')
-    
+
     const submitButton = screen.getByRole('button', { name: /iniciar sesión/i })
     await user.click(submitButton)
-    
+
     await waitFor(() => {
-      expect(screen.getByText(/el dni debe ser numérico y tener 7-8 dígitos/i)).toBeInTheDocument()
+      expect(screen.getByText(/el dni debe tener exactamente 11 dígitos/i)).toBeInTheDocument()
     })
   })
 
-  it('accepts valid DNI with 7 digits', async () => {
+  it('accepts valid DNI with 11 digits', async () => {
     const handleSubmit = vi.fn()
     const user = userEvent.setup()
     render(<LoginForm onSubmit={handleSubmit} />)
-    
+
     const dniInput = screen.getByLabelText(/dni/i)
     const passwordInput = screen.getByLabelText(/contraseña/i)
-    
-    await user.type(dniInput, '1234567')
+
+    await user.type(dniInput, '12345678901')
     await user.type(passwordInput, 'password123')
-    
+
     const submitButton = screen.getByRole('button', { name: /iniciar sesión/i })
     await user.click(submitButton)
-    
+
     await waitFor(() => {
       expect(handleSubmit).toHaveBeenCalledWith({
-        dni: '1234567',
+        dni: '12345678901',
         password: 'password123',
       })
     })
   })
 
-  it('accepts valid DNI with 8 digits', async () => {
-    const handleSubmit = vi.fn()
+  it('rejects DNI with more than 11 digits', async () => {
     const user = userEvent.setup()
-    render(<LoginForm onSubmit={handleSubmit} />)
-    
+    render(<LoginForm />)
+
     const dniInput = screen.getByLabelText(/dni/i)
-    const passwordInput = screen.getByLabelText(/contraseña/i)
-    
-    await user.type(dniInput, '12345678')
-    await user.type(passwordInput, 'password123')
-    
+    await user.type(dniInput, '123456789012')
+
     const submitButton = screen.getByRole('button', { name: /iniciar sesión/i })
     await user.click(submitButton)
-    
+
     await waitFor(() => {
-      expect(handleSubmit).toHaveBeenCalledWith({
-        dni: '12345678',
-        password: 'password123',
-      })
+      expect(screen.getByText(/el dni debe tener exactamente 11 dígitos/i)).toBeInTheDocument()
     })
   })
 
@@ -105,19 +98,19 @@ describe('LoginForm', () => {
     })
     const user = userEvent.setup()
     render(<LoginForm onSubmit={handleSubmit} />)
-    
+
     const dniInput = screen.getByLabelText(/dni/i)
     const passwordInput = screen.getByLabelText(/contraseña/i)
-    
-    await user.type(dniInput, '12345678')
+
+    await user.type(dniInput, '12345678901')
     await user.type(passwordInput, 'password123')
-    
+
     const submitButton = screen.getByRole('button', { name: /iniciar sesión/i })
     await user.click(submitButton)
-    
+
     // Check for loading state
     await waitFor(() => {
-      expect(screen.getByText(/loading/i)).toBeInTheDocument()
+      expect(screen.getByText(/cargando/i)).toBeInTheDocument()
     })
   })
 
@@ -127,16 +120,16 @@ describe('LoginForm', () => {
     })
     const user = userEvent.setup()
     render(<LoginForm onSubmit={handleSubmit} />)
-    
+
     const dniInput = screen.getByLabelText(/dni/i)
     const passwordInput = screen.getByLabelText(/contraseña/i)
-    
-    await user.type(dniInput, '12345678')
+
+    await user.type(dniInput, '12345678901')
     await user.type(passwordInput, 'password123')
-    
+
     const submitButton = screen.getByRole('button', { name: /iniciar sesión/i })
     await user.click(submitButton)
-    
+
     await waitFor(() => {
       expect(screen.getByRole('button')).toBeDisabled()
     })

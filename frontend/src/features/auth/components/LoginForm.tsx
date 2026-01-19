@@ -8,7 +8,7 @@ const loginSchema = z.object({
   dni: z
     .string()
     .min(1, 'El DNI es requerido')
-    .regex(/^\d{7,8}$/, 'El DNI debe ser numérico y tener 7-8 dígitos'),
+    .regex(/^\d{11}$/, 'El DNI debe tener exactamente 11 dígitos'),
   password: z.string().min(1, 'La contraseña es requerida'),
 })
 
@@ -43,7 +43,7 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
         error={errors.dni?.message}
         autoComplete="username"
       />
-      
+
       <Input
         {...register('password')}
         label="Contraseña"

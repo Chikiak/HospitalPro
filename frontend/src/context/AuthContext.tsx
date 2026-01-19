@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Load user from localStorage on mount
     const storedUser = localStorage.getItem('user')
     const token = localStorage.getItem('access_token')
-    
+
     if (storedUser && token) {
       try {
         return JSON.parse(storedUser)
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null
   })
   const [isLoading, setIsLoading] = useState(false)
-  
+
   const login = async (dni: string, password: string) => {
     setIsLoading(true)
     try {
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userProfile: User = {
         id: 0,
         dni,
-        full_name: 'User',
+        full_name: 'Usuario',
         role: 'patient',
         is_active: true,
       }
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         full_name: data.full_name,
         role: data.role || 'patient',
       })
-      
+
       // After successful registration, automatically log in
       await login(data.dni, data.password)
     } catch (error) {

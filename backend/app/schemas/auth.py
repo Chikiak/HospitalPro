@@ -9,5 +9,5 @@ class Token(BaseModel):
 
 class LoginRequest(BaseModel):
     """Schema for login request."""
-    dni: str = Field(..., min_length=1, description="DNI/Cedula")
+    dni: str = Field(..., min_length=11, max_length=11, pattern=r"^\d{11}$", description="DNI/Cedula")
     password: str = Field(..., min_length=1, description="Password")

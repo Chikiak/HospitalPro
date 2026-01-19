@@ -29,22 +29,22 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </div>
             <div>
               <h1 className="text-3xl font-black tracking-tighter uppercase">HospitalPro</h1>
-              <p className="text-sm font-medium text-emerald-300">Advanced Care Management</p>
+              <p className="text-sm font-medium text-emerald-300">Gestión de Atención Avanzada</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <h2 className="text-5xl font-bold leading-tight tracking-tight">
-              Reinventing <br /> Healthcare <br />
-              <span className="text-emerald-400">Management.</span>
+              Reinventando la <br /> Gestión de <br />
+              <span className="text-emerald-400">Salud.</span>
             </h2>
             <p className="text-slate-200 text-lg max-w-sm">
-              Experience the next generation of professional medical organization. Streamlined, intuitive, and remarkably efficient.
+              Experimente la próxima generación de organización médica profesional. Simplificada, intuitiva y notablemente eficiente.
             </p>
           </div>
 
           <div className="text-slate-300 text-xs font-medium uppercase tracking-widest">
-            Established 2026 • Premium Experience
+            Establecido 2026 • Experiencia Premium
           </div>
         </div>
 

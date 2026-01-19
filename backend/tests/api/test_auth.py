@@ -10,7 +10,7 @@ async def test_register_user(client: AsyncClient):
     response = await client.post(
         "/auth/users/register",
         json={
-            "dni": "12345678",
+            "dni": "12345678901",
             "password": "testpassword123",
             "full_name": "Test User",
             "role": "patient",
@@ -19,7 +19,7 @@ async def test_register_user(client: AsyncClient):
     
     assert response.status_code == 201
     data = response.json()
-    assert data["dni"] == "12345678"
+    assert data["dni"] == "12345678901"
     assert data["full_name"] == "Test User"
     assert data["role"] == "patient"
     assert data["is_active"] is True
@@ -34,7 +34,7 @@ async def test_register_duplicate_dni(client: AsyncClient):
     await client.post(
         "/auth/users/register",
         json={
-            "dni": "12345678",
+            "dni": "12345678901",
             "password": "testpassword123",
             "full_name": "Test User",
             "role": "patient",
@@ -45,7 +45,7 @@ async def test_register_duplicate_dni(client: AsyncClient):
     response = await client.post(
         "/auth/users/register",
         json={
-            "dni": "12345678",
+            "dni": "12345678901",
             "password": "anotherpassword",
             "full_name": "Another User",
             "role": "patient",
@@ -63,7 +63,7 @@ async def test_login_success(client: AsyncClient):
     await client.post(
         "/auth/users/register",
         json={
-            "dni": "12345678",
+            "dni": "12345678901",
             "password": "testpassword123",
             "full_name": "Test User",
             "role": "patient",
@@ -74,7 +74,7 @@ async def test_login_success(client: AsyncClient):
     response = await client.post(
         "/auth/login/access-token",
         json={
-            "dni": "12345678",
+            "dni": "12345678901",
             "password": "testpassword123",
         },
     )
@@ -94,7 +94,7 @@ async def test_login_wrong_password(client: AsyncClient):
     await client.post(
         "/auth/users/register",
         json={
-            "dni": "12345678",
+            "dni": "12345678901",
             "password": "testpassword123",
             "full_name": "Test User",
             "role": "patient",
@@ -105,7 +105,7 @@ async def test_login_wrong_password(client: AsyncClient):
     response = await client.post(
         "/auth/login/access-token",
         json={
-            "dni": "12345678",
+            "dni": "12345678901",
             "password": "wrongpassword",
         },
     )
@@ -120,7 +120,7 @@ async def test_login_nonexistent_user(client: AsyncClient):
     response = await client.post(
         "/auth/login/access-token",
         json={
-            "dni": "99999999",
+            "dni": "99999999999",
             "password": "somepassword",
         },
     )

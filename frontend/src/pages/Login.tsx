@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import AuthLayout from '../layouts/AuthLayout'
 import LoginForm from '../features/auth/components/LoginForm'
 import { useAuth } from '../context/AuthContext'
@@ -36,20 +36,20 @@ export default function Login() {
           <h2 className="text-2xl font-bold text-slate-900">Iniciar Sesión</h2>
           <p className="text-slate-600">Ingrese sus credenciales para acceder al sistema</p>
         </div>
-        
+
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
             {error}
           </div>
         )}
-        
+
         <LoginForm onSubmit={handleLogin} />
-        
+
         <div className="text-center text-sm text-slate-600">
-          ¿Olvidó su contraseña?{' '}
-          <a href="#" className="font-medium text-teal-700 hover:text-teal-600">
-            Recuperar acceso
-          </a>
+          ¿No tiene una cuenta?{' '}
+          <Link to="/registro" className="font-medium text-teal-700 hover:text-teal-600">
+            Registrarse ahora
+          </Link>
         </div>
       </div>
     </AuthLayout>

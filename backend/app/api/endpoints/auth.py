@@ -24,7 +24,7 @@ async def login(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect DNI or password",
+            detail="DNI o contraseña incorrectos",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -52,5 +52,5 @@ async def register(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="User with this DNI already exists",
+            detail="Ya existe un usuario con este DNI",
         )

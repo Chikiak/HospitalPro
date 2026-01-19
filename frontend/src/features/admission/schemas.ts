@@ -3,8 +3,7 @@ import { z } from 'zod';
 // Identification Step Schema
 export const identificationSchema = z.object({
   dni: z.string()
-    .min(7, 'DNI debe tener al menos 7 caracteres')
-    .max(10, 'DNI debe tener máximo 10 caracteres')
+    .length(11, 'DNI debe tener exactamente 11 caracteres')
     .regex(/^[0-9]+$/, 'DNI debe contener solo números'),
   firstName: z.string().min(2, 'Nombre debe tener al menos 2 caracteres'),
   lastName: z.string().min(2, 'Apellido debe tener al menos 2 caracteres'),
