@@ -77,6 +77,12 @@ export default function AdminSettings() {
     // TODO: Implement API call to save settings
   }
 
+  const handleCancel = () => {
+    // Reset to default or navigate away
+    console.log('Cancelling changes')
+    // TODO: Implement navigation or reset functionality
+  }
+
   const renderScheduleConfig = (type: 'specialty' | 'laboratory') => {
     const schedule = type === 'specialty' ? specialtySchedule : laboratorySchedule
 
@@ -152,9 +158,7 @@ export default function AdminSettings() {
                       updateSchedule(type, day.id, 'rotation', e.target.value)
                     }
                     disabled={!config.enabled}
-                    className={`flex h-12 w-full rounded-xl border border-slate-200 bg-white/50 px-4 py-3 text-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white disabled:cursor-not-allowed disabled:opacity-50 ${
-                      !config.enabled ? 'opacity-50' : ''
-                    }`}
+                    className="flex h-12 w-full rounded-xl border border-slate-200 bg-white/50 px-4 py-3 text-sm transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {ROTATION_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -185,7 +189,7 @@ export default function AdminSettings() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={handleSave}>
+          <Button variant="outline" onClick={handleCancel}>
             Cancelar
           </Button>
           <Button onClick={handleSave}>
