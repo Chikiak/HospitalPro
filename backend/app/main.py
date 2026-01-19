@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.endpoints import auth
 from app.api.endpoints import appointments
+from app.api.endpoints import patients
 from app.core.database import init_db
 
 
@@ -42,3 +43,4 @@ def health_check():
 # Include routers
 app.include_router(auth.router)
 app.include_router(appointments.router)
+app.include_router(patients.router)
