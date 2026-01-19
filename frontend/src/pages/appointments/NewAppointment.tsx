@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import api from '../../lib/axios'
+import api from '../../lib/api'
 import Button from '../../components/ui/Button'
 import { Calendar, Check, ChevronLeft, Clock, User, Stethoscope, ArrowRight, ShieldCheck } from 'lucide-react'
 import { cn } from '../../lib/utils'

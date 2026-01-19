@@ -1,6 +1,6 @@
 import { Users, Calendar, Clock, TrendingUp, Activity, ArrowRight, UserPlus } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import api from '../lib/axios'
+import api from '../lib/api'
 import Button from '../components/ui/Button'
 // @ts-ignore
 import dashboardIll from '../assets/dashboard_ill.png'
