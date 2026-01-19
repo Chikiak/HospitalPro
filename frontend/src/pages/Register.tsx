@@ -13,8 +13,8 @@ export default function Register() {
         try {
             setError(null)
             await register(data)
-            // Redirect to dashboard on successful registration
-            navigate('/')
+            // Redirect to step 2 (medical history) after successful registration
+            navigate('/registro/paso2')
         } catch (err) {
             const error = err as { response?: { data?: { detail?: string } } }
             if (error.response?.data?.detail) {
