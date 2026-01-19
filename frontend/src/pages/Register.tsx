@@ -13,8 +13,8 @@ export default function Register() {
         try {
             setError(null)
             await register(data)
-            // Redirect to dashboard on successful registration
-            navigate('/')
+            // Redirect to complete profile on successful registration
+            navigate('/registro/completar-perfil')
         } catch (err) {
             const error = err as { response?: { data?: { detail?: string } } }
             if (error.response?.data?.detail) {
