@@ -4,9 +4,9 @@ import api from '../lib/axios'
 
 interface User {
   id: number
-  dni: string
+  dni: string | null
   full_name: string
-  role: 'patient' | 'doctor' | 'admin'
+  role: 'patient' | 'doctor' | 'admin' | 'staff'
   is_active: boolean
 }
 
@@ -15,6 +15,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   login: (dni: string, password: string) => Promise<void>
+  staffLogin: (password: string) => Promise<void>
   register: (data: RegisterData) => Promise<void>
   logout: () => void
 }
@@ -110,10 +111,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const staffLogin = async (password: string) => {
+    setIsLoading(true)
+    try {
+      const response = await api.post('/auth/login/staff', {
+        password,
+      })
+
+      const { access_token } = response.data
+
+      // Store token
+      localStorage.setItem('access_token', access_token)
+
+      // Create staff user profile
+      const userProfile: User = {
+        id: 0,
+        dni: null,
+        full_name: 'Personal',
+        role: 'staff',
+        is_active: true,
+      }
+
+      localStorage.setItem('user', JSON.stringify(userProfile))
+      setUser(userProfile)
+    } catch (error) {
+      console.error('Staff login error:', error)
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const logout = () => {
+    // Clear all localStorage items
     localStorage.removeItem('access_token')
     localStorage.removeItem('user')
+    // Clear user state
     setUser(null)
+    // Reset loading state
+    setIsLoading(false)
   }
 
   const value = {
@@ -121,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     isLoading,
     login,
+    staffLogin,
     register,
     logout,
   }
