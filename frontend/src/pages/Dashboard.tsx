@@ -1,6 +1,9 @@
-import { Users, Calendar, Clock, TrendingUp } from 'lucide-react'
+import { Users, Calendar, Clock, TrendingUp, Activity, ArrowRight, UserPlus } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import api from '../lib/axios'
+import Button from '../components/ui/Button'
+// @ts-ignore
+import dashboardIll from '../assets/dashboard_ill.png'
 
 // Types
 interface Appointment {
@@ -12,7 +15,7 @@ interface Appointment {
   status: 'confirmed' | 'pending' | 'completed'
 }
 
-// Mock data for fallback
+// Mock data remains the same
 const MOCK_APPOINTMENTS: Appointment[] = [
   {
     id: '1',
@@ -41,20 +44,13 @@ const MOCK_APPOINTMENTS: Appointment[] = [
 ]
 
 export default function Dashboard() {
-  // Fetch user's appointments
-  const { data: appointments = MOCK_APPOINTMENTS, isLoading, error } = useQuery<Appointment[]>({
+  const { data: appointments = MOCK_APPOINTMENTS, isLoading } = useQuery<Appointment[]>({
     queryKey: ['appointments', 'me'],
     queryFn: async () => {
       try {
         const response = await api.get('/appointments/me')
-        // Ensure we always return an array
-        if (Array.isArray(response.data)) {
-          return response.data
-        }
-        console.warn('API returned non-array data, using mock data')
-        return MOCK_APPOINTMENTS
+        return Array.isArray(response.data) ? response.data : MOCK_APPOINTMENTS
       } catch (error) {
-        // Fallback to mock data if API fails
         console.warn('API not available, using mock data:', error)
         return MOCK_APPOINTMENTS
       }
@@ -71,142 +67,132 @@ export default function Dashboard() {
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
-      case 'confirmed':
-        return 'bg-green-100 text-green-700'
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-700'
-      case 'completed':
-        return 'bg-blue-100 text-blue-700'
-      default:
-        return 'bg-slate-100 text-slate-700'
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'Confirmado'
-      case 'pending':
-        return 'Pendiente'
-      case 'completed':
-        return 'Completado'
-      default:
-        return status
+      case 'confirmed': return 'bg-emerald-100 text-emerald-700'
+      case 'pending': return 'bg-amber-100 text-amber-700'
+      case 'completed': return 'bg-indigo-100 text-indigo-700'
+      default: return 'bg-slate-100 text-slate-700'
     }
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-600 mt-2">Vista general del sistema de gestión de turnos</p>
+    <div className="space-y-10 pb-12">
+      {/* Header Section with Welcome */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-1">
+          <h1 className="text-4xl font-black tracking-tight text-slate-900">
+            Panel de <span className="text-primary">Control</span>
+          </h1>
+          <p className="text-slate-500 font-medium">Bienvenido de nuevo al sistema HospitalPro.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="hidden sm:flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Reportes
+          </Button>
+          <Button className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Nuevo Turno
+          </Button>
+        </div>
+      </div>
+
+      {/* Hero-like Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-slate-900 p-8 md:p-12 text-white shadow-2xl">
+        <div className="relative z-10 max-w-lg space-y-6">
+          <span className="inline-block px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-bold uppercase tracking-widest border border-primary/30">
+            Actualización del Sistema
+          </span>
+          <h2 className="text-3xl md:text-4xl font-bold leading-tight">
+            Optimiza la atención de tus pacientes hoy mismo.
+          </h2>
+          <p className="text-slate-300 text-lg">
+            Hemos integrado nuevas herramientas de triaje y seguimiento post-consulta.
+          </p>
+          <Button className="bg-white text-slate-900 border-none hover:bg-slate-100">
+            Ver Novedades <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+        <img
+          src={dashboardIll}
+          alt="Dashboard Illustration"
+          className="absolute right-[-10%] top-[-20%] w-[60%] opacity-40 mix-blend-screen pointer-events-none hidden lg:block"
+        />
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg p-6 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Pacientes Totales</p>
-              <p className="text-3xl font-bold text-slate-900 mt-2">1,234</p>
+        {[
+          { label: 'Pacientes Totales', value: '1,234', icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Turnos de Hoy', value: '42', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Tiempo Promedio', value: '24min', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Nuevos Registros', value: '+12', icon: UserPlus, color: 'text-rose-600', bg: 'bg-rose-50' },
+        ].map((stat, i) => (
+          <div key={i} className="premium-card group">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">{stat.label}</p>
+                <p className="text-3xl font-black text-slate-900">{stat.value}</p>
+              </div>
+              <div className={`${stat.bg} ${stat.color} p-4 rounded-2xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}>
+                <stat.icon className="h-6 w-6" />
+              </div>
             </div>
-            <div className="bg-teal-100 p-3 rounded-lg">
-              <Users className="h-6 w-6 text-teal-700" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-1 text-sm">
-            <TrendingUp className="h-4 w-4 text-green-600" />
-            <span className="text-green-600">+12%</span>
-            <span className="text-slate-600">desde el mes pasado</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Turnos de Hoy</p>
-              <p className="text-3xl font-bold text-slate-900 mt-2">42</p>
-            </div>
-            <div className="bg-blue-100 p-3 rounded-lg">
-              <Calendar className="h-6 w-6 text-blue-700" />
+            <div className="mt-4 flex items-center gap-2">
+              <span className="flex items-center text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                <TrendingUp className="h-3 w-3 mr-1" /> +12%
+              </span>
+              <span className="text-xs text-slate-400 font-medium tracking-tight">vs mes pasado</span>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-sm">
-            <span className="text-slate-600">18 completados, 24 pendientes</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Tiempo Promedio</p>
-              <p className="text-3xl font-bold text-slate-900 mt-2">24min</p>
-            </div>
-            <div className="bg-purple-100 p-3 rounded-lg">
-              <Clock className="h-6 w-6 text-purple-700" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-1 text-sm">
-            <span className="text-slate-600">por consulta</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Tasa de Ocupación</p>
-              <p className="text-3xl font-bold text-slate-900 mt-2">87%</p>
-            </div>
-            <div className="bg-orange-100 p-3 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-orange-700" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-1 text-sm">
-            <span className="text-slate-600">capacidad utilizada</span>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white rounded-lg border border-slate-200">
-        <div className="p-6 border-b border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-900">Próximos Turnos</h2>
+      {/* Activity Table */}
+      <div className="premium-card !p-0 overflow-hidden border-none shadow-xl bg-white">
+        <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+          <div>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Próximos Turnos</h2>
+            <p className="text-sm font-medium text-slate-500">Listado actualizado en tiempo real</p>
+          </div>
+          <Button variant="ghost" className="text-xs font-bold uppercase tracking-widest">
+            Ver Todos
+          </Button>
         </div>
-        <div className="p-6">
+        <div className="p-4">
           {isLoading ? (
-            <div className="text-center py-8">
-              <p className="text-slate-600">Cargando turnos...</p>
-            </div>
-          ) : error ? (
-            <div className="text-center py-8">
-              <p className="text-red-600">Error al cargar los turnos</p>
-            </div>
-          ) : !Array.isArray(appointments) || appointments.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-slate-600">No hay turnos programados</p>
+            <div className="flex flex-col items-center justify-center py-20 space-y-4">
+              <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+              <p className="text-slate-400 font-medium animate-pulse">Sincronizando datos...</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {appointments.map((appointment, index) => (
+            <div className="divide-y divide-slate-50">
+              {appointments.map((appointment) => (
                 <div
                   key={appointment.id}
-                  className={`flex items-center justify-between py-3 ${index < appointments.length - 1 ? 'border-b border-slate-100' : ''
-                    }`}
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl transition-colors hover:bg-slate-50/80 cursor-pointer"
                 >
-                  <div>
-                    <p className="font-medium text-slate-900">{appointment.patient_name}</p>
-                    <p className="text-sm text-slate-600">
-                      {appointment.specialty} - {appointment.doctor_name}
-                    </p>
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                      {appointment.patient_name[0]}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 group-hover:text-primary transition-colors">{appointment.patient_name}</p>
+                      <p className="text-xs font-medium text-slate-500">
+                        {appointment.specialty} • {appointment.doctor_name}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-slate-900">{formatTime(appointment.date)}</p>
+                  <div className="flex items-center justify-between sm:justify-end gap-6 mt-4 sm:mt-0">
+                    <div className="text-right">
+                      <p className="text-sm font-black text-slate-900">{formatTime(appointment.date)}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Hoy</p>
+                    </div>
                     <span
-                      className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusBadgeClass(
+                      className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm ${getStatusBadgeClass(
                         appointment.status
                       )}`}
                     >
-                      {getStatusText(appointment.status)}
+                      {appointment.status}
                     </span>
                   </div>
                 </div>

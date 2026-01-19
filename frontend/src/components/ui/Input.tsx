@@ -16,30 +16,32 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-slate-700 mb-1"
+            className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2 ml-1"
           >
             {label}
           </label>
         )}
-        <input
-          ref={ref}
-          id={inputId}
-          className={cn(
-            'flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm',
-            'placeholder:text-slate-400',
-            'focus:outline-none focus:ring-2 focus:ring-teal-700 focus:ring-offset-2',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            error && 'border-red-600 focus:ring-red-600',
-            className
-          )}
-          aria-invalid={error ? 'true' : 'false'}
-          aria-describedby={error ? `${inputId}-error` : undefined}
-          {...props}
-        />
+        <div className="relative">
+          <input
+            ref={ref}
+            id={inputId}
+            className={cn(
+              'flex h-12 w-full rounded-xl border border-slate-200 bg-white/50 px-4 py-3 text-sm transition-all duration-200',
+              'placeholder:text-slate-400',
+              'focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              error && 'border-red-500 focus:ring-red-500/10 focus:border-red-500',
+              className
+            )}
+            aria-invalid={error ? 'true' : 'false'}
+            aria-describedby={error ? `${inputId}-error` : undefined}
+            {...props}
+          />
+        </div>
         {error && (
           <p
             id={`${inputId}-error`}
-            className="mt-1 text-sm text-red-600"
+            className="mt-1.5 text-xs font-medium text-red-500 ml-1"
             role="alert"
           >
             {error}

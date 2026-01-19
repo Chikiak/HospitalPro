@@ -8,12 +8,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', isLoading = false, disabled, children, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 px-4 py-2'
-    
+    const baseStyles = 'inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-95 disabled:pointer-events-none disabled:opacity-50 px-6 py-3'
+
     const variantStyles = {
-      primary: 'bg-teal-700 text-white hover:bg-teal-600 active:bg-teal-800',
-      outline: 'border-2 border-teal-700 text-teal-700 hover:bg-teal-50 active:bg-teal-100',
-      ghost: 'text-teal-700 hover:bg-teal-50 active:bg-teal-100'
+      primary: 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5',
+      outline: 'border-2 border-primary/20 bg-white/50 text-primary backdrop-blur-sm hover:bg-primary/5 hover:border-primary/40',
+      ghost: 'text-primary hover:bg-primary/10'
     }
 
     return (
@@ -26,7 +26,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {isLoading ? (
           <>
             <svg
-              className="animate-spin -ml-1 mr-2 h-4 w-4"
+              className="animate-spin -ml-1 mr-3 h-5 w-5"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -45,7 +45,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            Loading...
+            <span className="animate-pulse">Cargando...</span>
           </>
         ) : (
           children
