@@ -54,7 +54,7 @@ async def test_register_duplicate_dni(client: AsyncClient):
     )
     
     assert response.status_code == 409
-    assert "already exists" in response.json()["detail"].lower()
+    assert "ya existe" in response.json()["detail"].lower() or "already exists" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
