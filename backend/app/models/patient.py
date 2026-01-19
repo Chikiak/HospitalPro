@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,7 +20,12 @@ class TriageData(Base):
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     medical_history: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
     allergies: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    last_updated: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime, 
+        nullable=False, 
+        server_default=func.timezone('UTC', func.now()),
+        onupdate=func.timezone('UTC', func.now())
+    )
     
     # Relationship to User model
     # Note: We don't define the back_populates here to avoid modifying the existing User model

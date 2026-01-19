@@ -21,8 +21,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Modify triage_data table: change medical_history to JSON and add last_updated."""
-    # Add last_updated column with default value
-    op.add_column('triage_data', sa.Column('last_updated', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')))
+    # Add last_updated column with default value (UTC timestamp)
+    op.add_column('triage_data', sa.Column('last_updated', sa.DateTime(), nullable=False, server_default=sa.text("timezone('UTC', now())")))
     
     # Change medical_history from Text to JSON
     # First, we need to handle existing data - convert text to JSON format
