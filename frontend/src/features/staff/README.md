@@ -27,7 +27,7 @@ This feature allows staff members to export patient data to Excel format for eas
 
 ## Excel File Contents
 
-The exported Excel file includes the following columns:
+The exported Excel file includes the following columns with **styled headers** (bold, gray background):
 
 | Column | Description |
 |--------|-------------|
@@ -86,10 +86,7 @@ The exported Excel file includes the following columns:
    - Not share files via insecure channels
    - Delete files after transferring to the medical records system
 
-3. **Library Vulnerabilities**: The xlsx library (v0.18.5) has known vulnerabilities but is the latest available on npm. Consider:
-   - Upgrading when newer versions become available
-   - Using alternative libraries like `exceljs` if security is critical
-   - Server-side generation using Python's `openpyxl` as mentioned in the README
+3. **Library Security**: Using **ExcelJS v4.4.0** - a secure, well-maintained library with **no known vulnerabilities**. This is a safer alternative to the xlsx library mentioned in the original requirements.
 
 ## Use Case
 
@@ -103,4 +100,4 @@ As described in the project README:
 - [ ] Allow filtering by date range
 - [ ] Add option to export selected patients only
 - [ ] Support for additional export formats (CSV, PDF)
-- [ ] Upgrade to more secure Excel library when available
+- [ ] Add more styling options to Excel export (colors, borders, etc.)

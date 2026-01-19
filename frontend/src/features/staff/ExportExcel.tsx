@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import Button from '../../components/ui/Button';
 import api from '../../lib/api';
 
@@ -52,34 +52,54 @@ export default function ExportExcel() {
         };
       });
 
-      // Create workbook and worksheet
-      const worksheet = XLSX.utils.json_to_sheet(excelData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Pacientes');
+      // Create workbook and worksheet using ExcelJS
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Pacientes');
 
-      // Set column widths for better readability
-      const columnWidths = [
-        { wch: 8 },  // ID
-        { wch: 15 }, // DNI
-        { wch: 30 }, // Paciente
-        { wch: 10 }, // Estado
-        { wch: 30 }, // Alergias
-        { wch: 30 }, // Enfermedades Crónicas
-        { wch: 30 }, // Cirugías Previas
-        { wch: 30 }, // Medicación Actual
-        { wch: 30 }, // Antecedentes Familiares
-        { wch: 30 }, // Hábitos
-        { wch: 30 }, // Otros Datos Médicos
+      // Add headers
+      worksheet.columns = [
+        { header: 'ID', key: 'ID', width: 10 },
+        { header: 'DNI', key: 'DNI', width: 15 },
+        { header: 'Paciente', key: 'Paciente', width: 30 },
+        { header: 'Estado', key: 'Estado', width: 10 },
+        { header: 'Alergias', key: 'Alergias', width: 30 },
+        { header: 'Enfermedades Crónicas', key: 'Enfermedades Crónicas', width: 30 },
+        { header: 'Cirugías Previas', key: 'Cirugías Previas', width: 30 },
+        { header: 'Medicación Actual', key: 'Medicación Actual', width: 30 },
+        { header: 'Antecedentes Familiares', key: 'Antecedentes Familiares', width: 30 },
+        { header: 'Hábitos', key: 'Hábitos', width: 30 },
+        { header: 'Otros Datos Médicos', key: 'Otros Datos Médicos', width: 30 },
       ];
-      worksheet['!cols'] = columnWidths;
+
+      // Add data rows
+      worksheet.addRows(excelData);
+
+      // Style the header row
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' },
+      };
 
       // Generate filename with current date
       const now = new Date();
       const dateStr = now.toLocaleDateString('sv-SE'); // YYYY-MM-DD format
       const filename = `pacientes_${dateStr}.xlsx`;
 
-      // Download the file
-      XLSX.writeFile(workbook, filename);
+      // Generate and download the file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      
+      // Create download link and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      window.URL.revokeObjectURL(url);
 
     } catch (err) {
       console.error('Error al exportar datos:', err);
