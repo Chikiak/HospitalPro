@@ -11,16 +11,12 @@ const registerSchema = z.object({
         .regex(/^\d+$/, 'El DNI debe contener solo números'),
     full_name: z.string().min(3, 'El nombre completo debe tener al menos 3 caracteres'),
     password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
-    confirmPassword: z.string().min(1, 'Debe confirmar su contraseña'),
-}).refine((data) => data.password === data.confirmPassword, {
-    message: "Las contraseñas no coinciden",
-    path: ["confirmPassword"],
 })
 
 type RegisterFormData = z.infer<typeof registerSchema>
 
 interface RegisterFormProps {
-    onSubmit?: (data: Omit<RegisterFormData, 'confirmPassword'>) => void | Promise<void>
+    onSubmit?: (data: RegisterFormData) => void | Promise<void>
 }
 
 export default function RegisterForm({ onSubmit }: RegisterFormProps) {
@@ -34,9 +30,7 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
 
     const handleFormSubmit = async (data: RegisterFormData) => {
         if (onSubmit) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { confirmPassword, ...registerData } = data
-            await onSubmit(registerData)
+            await onSubmit(data)
         }
     }
 
@@ -64,15 +58,6 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
                 type="password"
                 placeholder="Mínimo 6 caracteres"
                 error={errors.password?.message}
-                autoComplete="new-password"
-            />
-
-            <Input
-                {...register('confirmPassword')}
-                label="Confirmar Contraseña"
-                type="password"
-                placeholder="Repita su contraseña"
-                error={errors.confirmPassword?.message}
                 autoComplete="new-password"
             />
 
