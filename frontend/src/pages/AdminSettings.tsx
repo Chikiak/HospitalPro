@@ -127,7 +127,6 @@ export default function AdminSettings() {
                       updateSchedule(type, day.id, 'start_time', e.target.value)
                     }
                     disabled={!config.enabled}
-                    className={!config.enabled ? 'opacity-50' : ''}
                   />
                 </div>
 
@@ -143,7 +142,6 @@ export default function AdminSettings() {
                     disabled={!config.enabled}
                     min="5"
                     step="5"
-                    className={!config.enabled ? 'opacity-50' : ''}
                   />
                 </div>
 
