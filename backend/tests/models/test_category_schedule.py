@@ -63,15 +63,13 @@ async def test_create_category_schedule_laboratory(test_db: AsyncSession):
     assert category_schedule.rotation_weeks == 2
 
 
-@pytest.mark.asyncio
-async def test_category_type_enum_values():
+def test_category_type_enum_values():
     """Test CategoryType enum values."""
     assert CategoryType.SPECIALTY.value == "specialty"
     assert CategoryType.LABORATORY.value == "laboratory"
 
 
-@pytest.mark.asyncio
-async def test_rotation_type_enum_values():
+def test_rotation_type_enum_values():
     """Test RotationType enum values."""
     assert RotationType.FIXED.value == "fixed"
     assert RotationType.ALTERNATED.value == "alternated"
