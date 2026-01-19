@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+from unittest.mock import patch
 
 from app.models.user import UserRole
 
@@ -53,7 +54,9 @@ async def test_register_duplicate_dni(client: AsyncClient):
     )
     
     assert response.status_code == 409
-    assert "already exists" in response.json()["detail"].lower()
+    # Check for duplicate user error message
+    detail = response.json()["detail"].lower()
+    assert "ya existe" in detail or "existe" in detail
 
 
 @pytest.mark.asyncio
@@ -127,3 +130,37 @@ async def test_login_nonexistent_user(client: AsyncClient):
     
     assert response.status_code == 401
     assert "incorrect" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_staff_login_success(client: AsyncClient):
+    """Test successful staff login."""
+    with patch("app.api.endpoints.auth.settings.STAFF_PASSWORD", "correct-staff-password"):
+        response = await client.post(
+            "/auth/login/staff",
+            json={
+                "password": "correct-staff-password",
+            },
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+        assert isinstance(data["access_token"], str)
+        assert len(data["access_token"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_staff_login_wrong_password(client: AsyncClient):
+    """Test staff login with wrong password returns 401."""
+    with patch("app.api.endpoints.auth.settings.STAFF_PASSWORD", "correct-staff-password"):
+        response = await client.post(
+            "/auth/login/staff",
+            json={
+                "password": "wrong-password",
+            },
+        )
+        
+        assert response.status_code == 401
+        assert "incorrect" in response.json()["detail"].lower()

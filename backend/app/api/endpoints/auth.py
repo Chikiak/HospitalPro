@@ -1,11 +1,15 @@
 from typing import Annotated
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.schemas.auth import LoginRequest, Token
+from app.core.security import create_access_token
+from app.models.user import UserRole
+from app.schemas.auth import LoginRequest, StaffLoginRequest, Token
 from app.schemas.user import UserCreate, UserResponse
 from app.services.auth_service import AuthService
 
@@ -29,6 +33,31 @@ async def login(
         )
     
     access_token = auth_service.create_token(user)
+    return Token(access_token=access_token)
+
+
+@router.post("/login/staff", response_model=Token)
+async def login_staff(
+    credentials: StaffLoginRequest,
+) -> Token:
+    """Staff login endpoint - authenticate staff and return access token with staff role."""
+    # Validate that STAFF_PASSWORD is configured
+    if not settings.STAFF_PASSWORD:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Staff authentication is not configured",
+        )
+    
+    # Use constant-time comparison to prevent timing attacks
+    if not secrets.compare_digest(credentials.password, settings.STAFF_PASSWORD):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Contraseña de staff incorrecta",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create token with staff role
+    access_token = create_access_token({"sub": "staff", "role": UserRole.STAFF.value})
     return Token(access_token=access_token)
 
 
