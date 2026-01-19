@@ -7,6 +7,7 @@ import Register from './pages/Register'
 import RegisterStep2 from './pages/RegisterStep2'
 import Dashboard from './pages/Dashboard'
 import NewAppointment from './pages/appointments/NewAppointment'
+import AdminSettings from './pages/AdminSettings'
 import MainLayout from './layouts/MainLayout'
 
 function App() {
@@ -54,6 +55,16 @@ function App() {
           />
 
           {/* Private routes - Staff only (admin, doctor, staff roles) */}
+          <Route
+            path="/admin/settings"
+            element={
+              <RoleGuard allowedRoles={['admin', 'doctor', 'staff']}>
+                <MainLayout>
+                  <AdminSettings />
+                </MainLayout>
+              </RoleGuard>
+            }
+          />
           <Route
             path="/admin/*"
             element={
