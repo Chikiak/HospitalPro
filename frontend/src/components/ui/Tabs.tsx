@@ -13,9 +13,10 @@ export interface TabsProps {
   onTabChange?: (tabId: string) => void
   children: (activeTab: string) => ReactNode
   className?: string
+  indicatorColor?: string
 }
 
-export default function Tabs({ tabs, defaultTab, onTabChange, children, className }: TabsProps) {
+export default function Tabs({ tabs, defaultTab, onTabChange, children, className, indicatorColor = 'bg-primary' }: TabsProps) {
   const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id || '')
 
   const handleTabChange = (tabId: string) => {
@@ -24,18 +25,20 @@ export default function Tabs({ tabs, defaultTab, onTabChange, children, classNam
   }
 
   const activeIndex = tabs.findIndex(tab => tab.id === activeTab)
+  const tabCount = tabs.length
+  const tabWidth = 100 / tabCount
 
   return (
     <div className={cn('w-full', className)}>
       {/* Tab Headers */}
       <div className="relative mb-6">
         <div className="glass rounded-xl p-1.5 shadow-lg">
-          <div className="grid grid-cols-2 gap-1.5 relative">
+          <div className="grid gap-1.5 relative" style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
             {/* Sliding Background Indicator */}
             <div
-              className="absolute inset-y-1.5 bg-primary rounded-lg shadow-lg transition-all duration-300 ease-out"
+              className={cn("absolute inset-y-1.5 rounded-lg shadow-lg transition-all duration-300 ease-out", indicatorColor)}
               style={{
-                width: `calc(50% - 0.375rem)`,
+                width: `calc(${tabWidth}% - 0.375rem)`,
                 transform: `translateX(calc(${activeIndex * 100}% + ${activeIndex * 0.375}rem))`,
               }}
             />

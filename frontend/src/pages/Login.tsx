@@ -12,7 +12,6 @@ export default function Login() {
   const { login, staffLogin } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState('patient')
 
   const handlePatientLogin = async (data: { dni: string; password: string }) => {
     try {
@@ -54,8 +53,7 @@ export default function Login() {
     }
   }
 
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId)
+  const handleTabChange = () => {
     setError(null) // Clear errors when switching tabs
   }
 
@@ -84,7 +82,15 @@ export default function Login() {
           {(activeTab) => (
             <>
               {activeTab === 'patient' && (
-                <LoginForm onSubmit={handlePatientLogin} />
+                <>
+                  <LoginForm onSubmit={handlePatientLogin} />
+                  <div className="text-center text-sm text-slate-600 mt-4">
+                    ¿No tiene una cuenta?{' '}
+                    <Link to="/registro" className="font-medium text-teal-700 hover:text-teal-600">
+                      Registrarse ahora
+                    </Link>
+                  </div>
+                </>
               )}
               {activeTab === 'staff' && (
                 <StaffLoginForm onSubmit={handleStaffLogin} />
@@ -92,15 +98,6 @@ export default function Login() {
             </>
           )}
         </Tabs>
-
-        {activeTab === 'patient' && (
-          <div className="text-center text-sm text-slate-600">
-            ¿No tiene una cuenta?{' '}
-            <Link to="/registro" className="font-medium text-teal-700 hover:text-teal-600">
-              Registrarse ahora
-            </Link>
-          </div>
-        )}
       </div>
     </AuthLayout>
   )
