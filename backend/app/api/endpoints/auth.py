@@ -1,4 +1,5 @@
 from typing import Annotated
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,7 +40,15 @@ async def login_staff(
     credentials: StaffLoginRequest,
 ) -> Token:
     """Staff login endpoint - authenticate staff and return access token with staff role."""
-    if credentials.password != settings.STAFF_PASSWORD:
+    # Validate that STAFF_PASSWORD is configured
+    if not settings.STAFF_PASSWORD:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Staff authentication is not configured",
+        )
+    
+    # Use constant-time comparison to prevent timing attacks
+    if not secrets.compare_digest(credentials.password, settings.STAFF_PASSWORD):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Contraseña de staff incorrecta",
