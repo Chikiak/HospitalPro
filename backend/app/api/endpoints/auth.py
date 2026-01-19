@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import create_access_token
+from app.models.user import UserRole
 from app.schemas.auth import LoginRequest, StaffLoginRequest, Token
 from app.schemas.user import UserCreate, UserResponse
 from app.services.auth_service import AuthService
@@ -56,7 +57,7 @@ async def login_staff(
         )
     
     # Create token with staff role
-    access_token = create_access_token({"sub": "staff", "role": "staff"})
+    access_token = create_access_token({"sub": "staff", "role": UserRole.STAFF.value})
     return Token(access_token=access_token)
 
 
