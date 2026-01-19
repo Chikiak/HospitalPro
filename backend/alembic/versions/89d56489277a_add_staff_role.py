@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Add STAFF to UserRole enum."""
     # For PostgreSQL, we need to use ALTER TYPE to add a new enum value
-    op.execute("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'staff'")
+    op.execute('ALTER TYPE "userrole" ADD VALUE IF NOT EXISTS \'staff\'')
 
 
 def downgrade() -> None:

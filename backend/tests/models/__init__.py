@@ -1,1 +1,1 @@
-"""Tests for user model."""
+"""Tests for models package."""
