@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '../../lib/api'
 import { Calendar, Clock, Search } from 'lucide-react'
-import { cn } from '../../lib/utils'
 
 // Types
 interface Category {
@@ -22,6 +21,9 @@ interface TimeSlot {
   category_name: string
   category_id: number
 }
+
+// Constants
+const MAX_SLOTS_TO_DISPLAY = 3
 
 // Mock data for fallback
 const MOCK_CATEGORIES: Category[] = [
@@ -116,7 +118,7 @@ export default function AppointmentSearch() {
         })
         
         // The API should return TimeSlot objects
-        return Array.isArray(response.data) ? response.data.slice(0, 3) : MOCK_SLOTS
+        return Array.isArray(response.data) ? response.data.slice(0, MAX_SLOTS_TO_DISPLAY) : MOCK_SLOTS
       } catch (error) {
         console.warn('API not available, using mock data:', error)
         return MOCK_SLOTS
@@ -247,9 +249,9 @@ export default function AppointmentSearch() {
             </div>
           ) : slots.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {slots.slice(0, 3).map((slot, index) => (
+              {slots.slice(0, MAX_SLOTS_TO_DISPLAY).map((slot) => (
                 <button
-                  key={index}
+                  key={`${slot.category_id}-${slot.slot_datetime}`}
                   onClick={() => handleSlotClick(slot)}
                   className="premium-card group hover:bg-slate-900 hover:text-white !p-0 overflow-hidden border-transparent transition-all duration-300"
                 >

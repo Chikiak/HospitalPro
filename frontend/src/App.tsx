@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import NewAppointment from './pages/appointments/NewAppointment'
 import AdminSettings from './pages/AdminSettings'
 import MainLayout from './layouts/MainLayout'
+import AppointmentSearch from './features/appointments/AppointmentSearch'
 
 function App() {
   return (
@@ -49,6 +50,16 @@ function App() {
               <RoleGuard allowedRoles={['patient']}>
                 <MainLayout>
                   <NewAppointment />
+                </MainLayout>
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/appointments/search"
+            element={
+              <RoleGuard allowedRoles={['patient']}>
+                <MainLayout>
+                  <AppointmentSearch />
                 </MainLayout>
               </RoleGuard>
             }
