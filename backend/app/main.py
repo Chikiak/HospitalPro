@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.endpoints import admin
 from app.api.endpoints import auth
 from app.api.endpoints import appointments
 from app.api.endpoints import patients
@@ -41,6 +42,7 @@ def health_check():
     return {"status": "ok"}
 
 # Include routers
+app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(appointments.router)
 app.include_router(patients.router)
