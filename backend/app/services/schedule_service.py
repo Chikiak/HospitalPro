@@ -24,6 +24,8 @@ class ScheduleService:
     """Service for schedule operations with rotation logic."""
     
     # Anchor date for calculating alternating rotations (January 1, 2024)
+    # This date is used as a reference point for week-based rotation calculations.
+    # Week 0 starts on this date, and subsequent weeks are numbered sequentially.
     ANCHOR_DATE = datetime(2024, 1, 1)
     
     def __init__(self, session: AsyncSession):
@@ -73,7 +75,7 @@ class ScheduleService:
         slots = self._generate_slots(category, date)
         
         # Filter out occupied slots
-        available_slots = await self._filter_occupied_slots(slots, category_id)
+        available_slots = await self._filter_occupied_slots(slots, category.name)
         
         return available_slots
     
@@ -137,14 +139,14 @@ class ScheduleService:
     async def _filter_occupied_slots(
         self, 
         slots: List[TimeSlot], 
-        category_id: int
+        category_name: str
     ) -> List[TimeSlot]:
         """
         Filter out time slots that are already occupied by appointments.
         
         Args:
             slots: List of all potential time slots
-            category_id: The category schedule ID
+            category_name: The name of the category (used to match with appointment.specialty)
         
         Returns:
             List of available (non-occupied) TimeSlot objects
@@ -155,13 +157,13 @@ class ScheduleService:
         # Get all slot datetimes
         slot_datetimes = [slot.slot_datetime for slot in slots]
         
-        # Query appointments that match any of these datetimes
-        # Note: We check appointments by date/time and specialty field
-        # The specialty field in appointments should match the category name
+        # Query appointments that match these datetimes AND the category specialty
+        # This ensures we only block slots for appointments of the same category
         result = await self.session.execute(
             select(Appointment).where(
                 and_(
                     Appointment.appointment_date.in_(slot_datetimes),
+                    Appointment.specialty == category_name,
                     Appointment.status.in_([
                         AppointmentStatus.SCHEDULED,
                         AppointmentStatus.CONFIRMED
