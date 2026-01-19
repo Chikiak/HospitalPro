@@ -22,7 +22,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Modify triage_data table: change medical_history to JSON and add last_updated."""
     # Add last_updated column with default value (UTC timestamp)
-    op.add_column('triage_data', sa.Column('last_updated', sa.DateTime(), nullable=False, server_default=sa.text("timezone('UTC', now())")))
+    op.add_column('triage_data', sa.Column('last_updated', sa.DateTime(), nullable=False, server_default=sa.func.timezone('UTC', sa.func.now())))
     
     # Create a trigger to automatically update last_updated on row modifications
     op.execute("""
@@ -56,12 +56,13 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Revert triage_data table changes: change medical_history to Text and remove last_updated."""
-    # Convert JSON back to Text
+    # Convert JSON back to Text, extracting legacy_text field if it exists
     op.execute("""
         ALTER TABLE triage_data 
         ALTER COLUMN medical_history TYPE TEXT 
         USING CASE 
             WHEN medical_history IS NULL THEN NULL
+            WHEN medical_history ? 'legacy_text' THEN medical_history->>'legacy_text'
             ELSE medical_history::TEXT
         END
     """)
