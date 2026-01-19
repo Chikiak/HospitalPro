@@ -405,3 +405,31 @@ async def test_alternated_rotation_3_week_cycle(test_db: AsyncSession):
     test_date = datetime(2024, 1, 22, 0, 0)
     slots = await service.get_available_slots(category.id, test_date)
     assert len(slots) == 2
+
+
+@pytest.mark.asyncio
+async def test_alternated_rotation_before_anchor_date(test_db: AsyncSession):
+    """Test that dates before the anchor date return no slots."""
+    # Create a category schedule with ALTERNATED rotation
+    category = CategorySchedule(
+        category_type=CategoryType.LABORATORY,
+        name="Blood Test",
+        day_of_week=0,  # Monday
+        start_time=time(8, 0),
+        turn_duration=15,
+        max_turns_per_block=3,
+        rotation_type=RotationType.ALTERNATED,
+        rotation_weeks=2,
+    )
+    test_db.add(category)
+    await test_db.commit()
+    await test_db.refresh(category)
+    
+    service = ScheduleService(test_db)
+    
+    # Test for a date before the anchor (December 25, 2023 - Monday)
+    test_date = datetime(2023, 12, 25, 0, 0)
+    slots = await service.get_available_slots(category.id, test_date)
+    
+    # Should have no slots (date is before anchor)
+    assert len(slots) == 0

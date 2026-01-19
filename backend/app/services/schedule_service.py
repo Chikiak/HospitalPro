@@ -25,7 +25,8 @@ class ScheduleService:
     
     # Anchor date for calculating alternating rotations (January 1, 2024)
     # This date is used as a reference point for week-based rotation calculations.
-    # Week 0 starts on this date, and subsequent weeks are numbered sequentially.
+    # Weeks are calculated as complete 7-day periods since the anchor date.
+    # Week 0 includes January 1-7, 2024; Week 1 is January 8-14, etc.
     ANCHOR_DATE = datetime(2024, 1, 1)
     
     def __init__(self, session: AsyncSession):
@@ -98,6 +99,11 @@ class ScheduleService:
             # ALTERNATED schedules use week-based rotation
             # Calculate week number from anchor date
             days_since_anchor = (date.date() - self.ANCHOR_DATE.date()).days
+            
+            # For dates before anchor, treat as inactive (alternatively could raise an error)
+            if days_since_anchor < 0:
+                return False
+            
             weeks_since_anchor = days_since_anchor // 7
             
             # Check if this week matches the rotation pattern
