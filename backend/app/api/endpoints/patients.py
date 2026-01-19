@@ -1,12 +1,16 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.core.database import get_db
+from app.models.patient import TriageData
+from app.models.user import User, UserRole
 from app.repositories.triage_repository import TriageRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.patient import TriageDataResponse, TriageDataUpdate
+from app.schemas.patient import PatientExportData, TriageDataResponse, TriageDataUpdate
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -94,3 +98,43 @@ async def get_medical_history(
         )
     
     return TriageDataResponse.model_validate(triage_data)
+
+
+@router.get("/", response_model=list[PatientExportData])
+async def list_all_patients(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[PatientExportData]:
+    """
+    List all patients with their medical data for export.
+    
+    Returns all patients with their basic information and triage data.
+    This endpoint is intended for staff to export patient data to Excel.
+    Uses a single database query with a left join for optimal performance.
+    
+    SECURITY TODO: Add authentication middleware to verify:
+    - The authenticated user has role staff, admin, or doctor
+    This prevents unauthorized access to all patient records.
+    """
+    # Use a single query with left join to get patients and their triage data
+    query = (
+        select(User, TriageData)
+        .outerjoin(TriageData, User.id == TriageData.patient_id)
+        .where(User.role == UserRole.PATIENT)
+        .order_by(User.id)
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    # Build response from the joined results
+    return [
+        PatientExportData(
+            id=user.id,
+            dni=user.dni,
+            full_name=user.full_name,
+            is_active=user.is_active,
+            medical_history=triage.medical_history if triage else None,
+            allergies=triage.allergies if triage else None,
+        )
+        for user, triage in rows
+    ]

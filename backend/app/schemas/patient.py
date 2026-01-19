@@ -39,3 +39,15 @@ class TriageDataResponse(BaseModel):
     medical_history: Optional[dict[str, Any]]
     allergies: Optional[str]
     last_updated: datetime
+
+
+class PatientExportData(BaseModel):
+    """Schema for patient data export (includes user and triage data)."""
+    # User data
+    id: int
+    dni: str
+    full_name: str
+    is_active: bool
+    # Triage data (optional, as patient may not have filled it yet)
+    medical_history: Optional[dict[str, Any]] = None
+    allergies: Optional[str] = None
