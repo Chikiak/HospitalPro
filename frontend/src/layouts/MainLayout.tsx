@@ -1,7 +1,8 @@
 import { type ReactNode } from 'react'
-import { HeartPulse, LayoutDashboard, Users, Calendar, Settings, LogOut, Bell, Search } from 'lucide-react'
+import { HeartPulse, LayoutDashboard, Calendar, LogOut, Bell, Search, User, FileText, Download } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '../lib/utils'
+import { useAuth } from '../context/AuthContext'
 
 interface MainLayoutProps {
   children: ReactNode
@@ -9,13 +10,24 @@ interface MainLayoutProps {
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation()
+  const { user } = useAuth()
 
-  const navItems = [
+  // Navigation for patients
+  const patientNav = [
     { label: 'Inicio', icon: LayoutDashboard, path: '/' },
-    { label: 'Pacientes', icon: Users, path: '/patients' },
-    { label: 'Turnos', icon: Calendar, path: '/appointments/new' },
-    { label: 'Configuración', icon: Settings, path: '/settings' },
+    { label: 'Mis Turnos', icon: Calendar, path: '/appointments/new' },
+    { label: 'Perfil', icon: User, path: '/profile' },
   ]
+
+  // Navigation for staff
+  const staffNav = [
+    { label: 'Calendario', icon: Calendar, path: '/calendar' },
+    { label: 'Gestión de Bloques', icon: FileText, path: '/blocks' },
+    { label: 'Exportar', icon: Download, path: '/export' },
+  ]
+
+  // Select navigation based on user role
+  const navItems = user?.role === 'staff' ? staffNav : patientNav
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans">
@@ -78,15 +90,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {/* Modern Header */}
         <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 h-20 flex items-center px-8 z-10 shrink-0">
           <div className="flex-1 flex items-center justify-between">
-            {/* Search Bar */}
-            <div className="hidden md:flex items-center bg-slate-100 rounded-2xl px-4 py-2 w-96 group transition-all focus-within:ring-2 focus-within:ring-primary/20 focus-within:bg-white">
-              <Search className="h-5 w-5 text-slate-400 mr-2 group-focus-within:text-primary transition-colors" />
-              <input
-                type="text"
-                placeholder="Buscar pacientes, citas..."
-                className="bg-transparent border-none outline-none text-sm font-medium w-full placeholder:text-slate-400"
-              />
-            </div>
+            {/* Search Bar - Hidden for staff */}
+            {user?.role !== 'staff' && (
+              <div className="hidden md:flex items-center bg-slate-100 rounded-2xl px-4 py-2 w-96 group transition-all focus-within:ring-2 focus-within:ring-primary/20 focus-within:bg-white">
+                <Search className="h-5 w-5 text-slate-400 mr-2 group-focus-within:text-primary transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Buscar pacientes, citas..."
+                  className="bg-transparent border-none outline-none text-sm font-medium w-full placeholder:text-slate-400"
+                />
+              </div>
+            )}
 
             {/* Profile & Notifications */}
             <div className="flex items-center gap-6">
@@ -97,11 +111,15 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
               <div className="flex items-center gap-4 pl-6 border-l border-slate-200">
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-black text-slate-900 leading-none">Dr. Adrian G.</p>
-                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">Administrador</p>
+                  <p className="text-sm font-black text-slate-900 leading-none">
+                    {user?.role === 'staff' ? 'Personal Administrativo' : user?.full_name || 'Usuario'}
+                  </p>
+                  <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">
+                    {user?.role === 'staff' ? 'Staff' : 'Paciente'}
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-primary text-white flex items-center justify-center font-black shadow-lg shadow-primary/20 cursor-pointer transition-transform hover:scale-110 active:scale-95">
-                  AG
+                  {user?.role === 'staff' ? 'PA' : (user?.full_name?.[0] || 'U')}
                 </div>
               </div>
             </div>
