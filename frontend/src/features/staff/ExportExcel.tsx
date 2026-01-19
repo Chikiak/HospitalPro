@@ -9,7 +9,7 @@ interface PatientData {
   dni: string;
   full_name: string;
   is_active: boolean;
-  medical_history: Record<string, any> | null;
+  medical_history: Record<string, unknown> | null;
   allergies: string | null;
 }
 
