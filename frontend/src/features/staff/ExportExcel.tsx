@@ -26,7 +26,7 @@ export default function ExportExcel() {
       const response = await api.get<PatientData[]>('/patients/');
       const patients = response.data;
 
-      if (!patients || patients.length === 0) {
+      if (patients.length === 0) {
         setError('No hay pacientes registrados para exportar');
         return;
       }
@@ -75,7 +75,7 @@ export default function ExportExcel() {
 
       // Generate filename with current date
       const now = new Date();
-      const dateStr = now.toISOString().split('T')[0];
+      const dateStr = now.toLocaleDateString('sv-SE'); // YYYY-MM-DD format
       const filename = `pacientes_${dateStr}.xlsx`;
 
       // Download the file
