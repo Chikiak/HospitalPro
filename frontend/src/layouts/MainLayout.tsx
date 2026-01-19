@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { HeartPulse, LayoutDashboard, Users, Calendar, Settings, LogOut, Bell, Search, User, FileText, Download } from 'lucide-react'
+import { HeartPulse, LayoutDashboard, Calendar, LogOut, Bell, Search, User, FileText, Download } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '../lib/utils'
 import { useAuth } from '../context/AuthContext'
