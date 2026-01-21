@@ -44,6 +44,7 @@ async def login_staff(
     """Staff login endpoint - authenticate staff and return access token with staff role."""
     from sqlalchemy import select
     from app.models.system_config import SystemConfig
+    from app.models.user import User
     
     # Try to get persistent staff password from database
     result = await db.execute(select(SystemConfig).where(SystemConfig.key == "staff_password"))
@@ -65,19 +66,28 @@ async def login_staff(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Get or create a real staff user in the database
+    result = await db.execute(select(User).where(User.dni == "staff"))
+    staff_user = result.scalar_one_or_none()
+    
+    if not staff_user:
+        # Create the staff user if it doesn't exist
+        from app.core.security import get_password_hash
+        staff_user = User(
+            dni="staff",
+            hashed_password=get_password_hash(current_staff_password),
+            full_name="Personal Administrativo",
+            role=UserRole.STAFF,
+            is_active=True
+        )
+        db.add(staff_user)
+        await db.commit()
+        await db.refresh(staff_user)
+    
     # Create token with staff role
-    access_token = create_access_token({"sub": "staff", "role": UserRole.STAFF.value})
+    access_token = create_access_token({"sub": staff_user.dni, "role": UserRole.STAFF.value})
     
-    # Return a minimal staff user profile
-    staff_user = UserResponse(
-        id=0,
-        dni="staff",
-        full_name="Personal Administrativo",
-        role=UserRole.STAFF,
-        is_active=True
-    )
-    
-    return Token(access_token=access_token, user=staff_user)
+    return Token(access_token=access_token, user=UserResponse.model_validate(staff_user))
 
 
 from app.schemas.security import AdminVerifyRequest, StaffPasswordUpdateRequest

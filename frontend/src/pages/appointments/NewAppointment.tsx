@@ -120,7 +120,10 @@ export default function NewAppointment() {
   }
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
+    // Parse as local time by manually extracting date components
+    const [datePart] = dateString.split('T')
+    const [year, month, day] = datePart.split('-').map(Number)
+    const date = new Date(year, month - 1, day)
     return new Intl.DateTimeFormat('es-AR', {
       weekday: 'long',
       month: 'long',
@@ -129,7 +132,11 @@ export default function NewAppointment() {
   }
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
+    // Parse as local time by extracting time components
+    const timePart = dateString.split('T')[1] || '00:00:00'
+    const [hours, minutes] = timePart.split(':').map(Number)
+    const date = new Date()
+    date.setHours(hours, minutes, 0, 0)
     return new Intl.DateTimeFormat('es-AR', {
       hour: '2-digit',
       minute: '2-digit',
@@ -260,7 +267,7 @@ export default function NewAppointment() {
                 <ChevronLeft className="h-4 w-4 mr-1" /> VOLVER
               </Button>
             </div>
-            
+
             {/* Warning message for laboratories */}
             {turns.length > 0 && turns[0].warning_message && (
               <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
@@ -276,7 +283,7 @@ export default function NewAppointment() {
                 </div>
               </div>
             )}
-            
+
             {turnsLoading ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
                 <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
@@ -348,7 +355,7 @@ export default function NewAppointment() {
                     {selectedTurn && formatDate(selectedTurn.slot_datetime)} - {selectedTurn && formatTime(selectedTurn.slot_datetime)}
                   </p>
                 </div>
-                
+
                 {/* Warning message for laboratory appointments in confirmation step */}
                 {selectedTurn?.warning_message && (
                   <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 flex items-start gap-3">

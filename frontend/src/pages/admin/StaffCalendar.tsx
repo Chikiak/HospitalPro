@@ -102,7 +102,12 @@ export default function StaffCalendar() {
     }
 
     const formatTime = (isoString: string) => {
-        return new Date(isoString).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+        // Parse as local time by extracting time components
+        const timePart = isoString.split('T')[1] || '00:00:00'
+        const [hours, minutes] = timePart.split(':').map(Number)
+        const date = new Date()
+        date.setHours(hours, minutes, 0, 0)
+        return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
     }
 
     return (
