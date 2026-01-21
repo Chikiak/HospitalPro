@@ -33,23 +33,32 @@ async def login(
         )
     
     access_token = auth_service.create_token(user)
-    return Token(access_token=access_token)
+    return Token(access_token=access_token, user=UserResponse.model_validate(user))
 
 
 @router.post("/login/staff", response_model=Token)
 async def login_staff(
     credentials: StaffLoginRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
     """Staff login endpoint - authenticate staff and return access token with staff role."""
-    # Validate that STAFF_PASSWORD is configured
-    if not settings.STAFF_PASSWORD:
+    from sqlalchemy import select
+    from app.models.system_config import SystemConfig
+    
+    # Try to get persistent staff password from database
+    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "staff_password"))
+    config = result.scalar_one_or_none()
+    
+    current_staff_password = config.value if config else settings.STAFF_PASSWORD
+    
+    if not current_staff_password:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Staff authentication is not configured",
         )
     
     # Use constant-time comparison to prevent timing attacks
-    if not secrets.compare_digest(credentials.password, settings.STAFF_PASSWORD):
+    if not secrets.compare_digest(credentials.password, current_staff_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Contraseña de staff incorrecta",
@@ -58,7 +67,69 @@ async def login_staff(
     
     # Create token with staff role
     access_token = create_access_token({"sub": "staff", "role": UserRole.STAFF.value})
-    return Token(access_token=access_token)
+    
+    # Return a minimal staff user profile
+    staff_user = UserResponse(
+        id=0,
+        dni="staff",
+        full_name="Personal Administrativo",
+        role=UserRole.STAFF,
+        is_active=True
+    )
+    
+    return Token(access_token=access_token, user=staff_user)
+
+
+from app.schemas.security import AdminVerifyRequest, StaffPasswordUpdateRequest
+
+@router.post("/verify-admin", status_code=status.HTTP_200_OK)
+async def verify_admin(
+    credentials: AdminVerifyRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Verify admin password for sensitive operations."""
+    from sqlalchemy import select
+    from app.models.system_config import SystemConfig
+    
+    # Try to get persistent admin password from database
+    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "admin_password"))
+    config = result.scalar_one_or_none()
+    
+    current_admin_password = config.value if config else settings.ADMIN_PASSWORD
+    
+    if not secrets.compare_digest(credentials.password, current_admin_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Contraseña de administrador incorrecta",
+        )
+    
+    return {"message": "Admin verified"}
+
+
+@router.post("/update-staff-password", status_code=status.HTTP_200_OK)
+async def update_staff_password(
+    request: StaffPasswordUpdateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Update the staff password (requires admin authorization)."""
+    # 1. Verify admin password
+    await verify_admin(AdminVerifyRequest(password=request.admin_password), db)
+    
+    # 2. Update staff password in database
+    from sqlalchemy import select
+    from app.models.system_config import SystemConfig
+    
+    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "staff_password"))
+    config = result.scalar_one_or_none()
+    
+    if config:
+        config.value = request.new_staff_password
+    else:
+        config = SystemConfig(key="staff_password", value=request.new_staff_password)
+        db.add(config)
+    
+    await db.commit()
+    return {"message": "Staff password updated successfully"}
 
 
 @router.post("/users/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

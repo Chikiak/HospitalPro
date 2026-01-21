@@ -104,19 +104,19 @@ export default function AppointmentSearch() {
     queryKey: ['available-slots', selectedCategory?.id],
     queryFn: async () => {
       if (!selectedCategory) return []
-      
+
       try {
-        // Calculate today's date for the API call
-        const today = new Date()
-        const dateStr = today.toISOString().split('T')[0]
-        
-        const response = await api.get(`/schedules/slots`, {
+        // Calculate today's date for the API call (not needed for next-slots but kept for reference if needed)
+        // const today = new Date()
+        // const dateStr = today.toISOString().split('T')[0]
+
+        const response = await api.get(`/appointments/slots`, {
           params: {
-            category_id: selectedCategory.id,
-            date: dateStr,
+            category_name: selectedCategory.name,
+            category_type: selectedCategory.category_type,
           },
         })
-        
+
         // The API should return TimeSlot objects
         return Array.isArray(response.data) ? response.data.slice(0, MAX_SLOTS_TO_DISPLAY) : MOCK_SLOTS
       } catch (error) {
@@ -130,7 +130,7 @@ export default function AppointmentSearch() {
   // Filter categories based on search query
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim()) return []
-    
+
     const query = searchQuery.toLowerCase()
     return categories.filter((cat) =>
       cat.name.toLowerCase().includes(query)
@@ -151,9 +151,23 @@ export default function AppointmentSearch() {
     }
   }
 
-  const handleSlotClick = (slot: TimeSlot) => {
-    // In a real implementation, this would navigate to booking confirmation
-    alert(`Reservar turno: ${formatDateTime(slot.slot_datetime)} - ${slot.category_name}`)
+  const handleSlotClick = async (slot: TimeSlot) => {
+    try {
+      const response = await api.post('/appointments/book', {
+        category_id: slot.category_id,
+        appointment_date: slot.slot_datetime,
+        category_name: slot.category_name,
+        notes: 'Reserva desde el buscador inteligente'
+      })
+
+      if (response.status === 201) {
+        alert(`¡Turno reservado con éxito para el ${formatDateTime(slot.slot_datetime)}!`)
+        // Optionally refresh slots
+      }
+    } catch (err) {
+      console.error('Error booking appointment:', err)
+      alert('Error al reservar el turno. Por favor, intente nuevamente.')
+    }
   }
 
   const formatDateTime = (dateString: string) => {

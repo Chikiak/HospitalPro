@@ -1,0 +1,335 @@
+import { useState, useEffect } from 'react'
+import { Plus, Clock, Save, ArrowLeft } from 'lucide-react'
+import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
+import api from '../../lib/api'
+
+// Types (Mirrors backend)
+interface DaySchedule {
+    id?: number
+    enabled: boolean
+    day_of_week: number
+    start_time: string
+    duration: number
+    rotation_type: 'fixed' | 'alternated'
+    rotation_weeks: number
+    start_date?: string // New field for rotation anchor
+}
+
+interface Category {
+    name: string
+    type: 'specialty' | 'laboratory'
+    schedules: Record<number, DaySchedule>
+}
+
+const DAYS = [
+    { id: 0, label: 'Lunes' },
+    { id: 1, label: 'Martes' },
+    { id: 2, label: 'Miércoles' },
+    { id: 3, label: 'Jueves' },
+    { id: 4, label: 'Viernes' },
+    { id: 5, label: 'Sábado' },
+    { id: 6, label: 'Domingo' },
+]
+
+interface AdminScheduleManagerProps {
+    adminPasswordProvider: () => Promise<string>
+}
+
+export default function AdminScheduleManager({ adminPasswordProvider }: AdminScheduleManagerProps) {
+    const [categories, setCategories] = useState<Category[]>([])
+    const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
+    const [newCategoryName, setNewCategoryName] = useState('')
+    const [newCategoryType, setNewCategoryType] = useState<'specialty' | 'laboratory'>('specialty')
+
+    useEffect(() => {
+        fetchSchedules()
+    }, [])
+
+    const fetchSchedules = async () => {
+        try {
+            const response = await api.get('/admin/schedules')
+            const data = response.data
+
+            // Transform flat list to grouped structure
+            const grouped: Record<string, Category> = {}
+            data.forEach((item: any) => {
+                if (!grouped[item.name]) {
+                    grouped[item.name] = {
+                        name: item.name,
+                        type: item.category_type,
+                        schedules: {}
+                    }
+                }
+                grouped[item.name].schedules[item.day_of_week] = {
+                    id: item.id,
+                    enabled: true,
+                    day_of_week: item.day_of_week,
+                    start_time: item.start_time.substring(0, 5),
+                    duration: item.turn_duration,
+                    rotation_type: item.rotation_type,
+                    rotation_weeks: item.rotation_weeks,
+                    start_date: item.start_date
+                }
+            })
+
+            setCategories(Object.values(grouped))
+        } catch (error) {
+            console.error("Error fetching schedules", error)
+        }
+    }
+
+    const handleCreateCategory = async () => {
+        if (!newCategoryName) return
+        try {
+            const pass = await adminPasswordProvider()
+            await api.post('/admin/categories', {
+                admin_password: pass,
+                category_type: newCategoryType,
+                name: newCategoryName
+            })
+            fetchSchedules()
+            setNewCategoryName('')
+        } catch (error) {
+            console.error("Failed to create category", error)
+        }
+    }
+
+    // ... Sub-component for editing specific category would go here
+
+    if (selectedCategory) {
+        return (
+            <CategoryEditor
+                category={selectedCategory}
+                onBack={() => {
+                    setSelectedCategory(null)
+                    fetchSchedules()
+                }}
+                adminPasswordProvider={adminPasswordProvider}
+            />
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="flex gap-4 items-end premium-card p-4">
+                <div className="flex-1">
+                    <label className="text-xs font-bold uppercase text-slate-500">Nombre</label>
+                    <Input
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder="Ej. Cardiología"
+                    />
+                </div>
+                <div className="w-40">
+                    <label className="text-xs font-bold uppercase text-slate-500">Tipo</label>
+                    <select
+                        className="w-full h-10 rounded-xl border-slate-200 bg-slate-50 text-sm font-medium"
+                        value={newCategoryType}
+                        onChange={(e: any) => setNewCategoryType(e.target.value)}
+                    >
+                        <option value="specialty">Especialidad</option>
+                        <option value="laboratory">Laboratorio</option>
+                    </select>
+                </div>
+                <Button onClick={handleCreateCategory}>
+                    <Plus size={18} className="mr-2" />
+                    Crear
+                </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categories.map(cat => (
+                    <div
+                        key={cat.name}
+                        onClick={() => setSelectedCategory(cat)}
+                        className="premium-card p-6 cursor-pointer hover:border-primary/50 transition-all group"
+                    >
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800 group-hover:text-primary transition-colors">{cat.name}</h3>
+                                <p className="text-xs font-bold uppercase text-slate-400 mt-1">{cat.type === 'specialty' ? 'Especialidad' : 'Laboratorio'}</p>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all">
+                                <Clock size={20} />
+                            </div>
+                        </div>
+                        <div className="mt-6 flex flex-wrap gap-2">
+                            {DAYS.map(day => {
+                                const hasSchedule = !!cat.schedules[day.id]
+                                return (
+                                    <span
+                                        key={day.id}
+                                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${hasSchedule
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : 'bg-slate-50 text-slate-300'
+                                            }`}
+                                        title={day.label}
+                                    >
+                                        {day.label[0]}
+                                    </span>
+                                )
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function CategoryEditor({ category, onBack, adminPasswordProvider }: { category: Category, onBack: () => void, adminPasswordProvider: () => Promise<string> }) {
+    const [editedCategory, setEditedCategory] = useState<Category>(JSON.parse(JSON.stringify(category)))
+    const [isSaving, setIsSaving] = useState(false)
+
+    const updateDay = (dayId: number, changes: Partial<DaySchedule>) => {
+        setEditedCategory(prev => {
+            const next = { ...prev }
+            const current = next.schedules[dayId] || {
+                enabled: false,
+                day_of_week: dayId,
+                start_time: '08:00',
+                duration: 30,
+                rotation_type: 'fixed',
+                rotation_weeks: 1,
+                start_date: new Date().toISOString().split('T')[0]
+            }
+            // If we are enabling, ensure object exists. If disabling, we keep it but mark enabled=false
+            next.schedules[dayId] = { ...current, ...changes }
+            if (changes.enabled === true) next.schedules[dayId].enabled = true
+            return next
+        })
+    }
+
+    const handleSave = async () => {
+        try {
+            const pass = await adminPasswordProvider()
+            setIsSaving(true)
+
+            const promises = Object.values(editedCategory.schedules).map(sch => {
+                if (!sch.enabled) return Promise.resolve() // Or delete if needed? Current API doesn't have delete-by-day easily, just update. Ideally strict "sync".
+
+                return api.post('/admin/schedules', {
+                    admin_password: pass,
+                    category_type: category.type,
+                    name: category.name,
+                    day_of_week: sch.day_of_week,
+                    start_time: sch.start_time, // Ensure HH:MM format
+                    turn_duration: sch.duration,
+                    max_turns_per_block: Math.floor(240 / sch.duration), // Simple heuristic: 4 hours block
+                    rotation_type: sch.rotation_type,
+                    rotation_weeks: sch.rotation_weeks,
+                    start_date: sch.rotation_type === 'alternated' ? sch.start_date : null
+                })
+            })
+
+            await Promise.all(promises)
+            setIsSaving(false)
+            onBack()
+        } catch (e) {
+            console.error(e)
+            setIsSaving(false)
+            alert("Error al guardar")
+        }
+    }
+
+    return (
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center gap-4">
+                <Button variant="outline" onClick={onBack} className="text-sm py-1">
+                    <ArrowLeft size={16} className="mr-2" /> Volver
+                </Button>
+                <h2 className="text-2xl font-black text-slate-800">
+                    Editar: <span className="text-primary">{category.name}</span>
+                </h2>
+                <div className="flex-1"></div>
+                <Button onClick={handleSave} isLoading={isSaving} className="shadow-lg shadow-primary/20">
+                    <Save size={18} className="mr-2" />
+                    Guardar Cambios
+                </Button>
+            </div>
+
+            <div className="grid gap-6">
+                {DAYS.map(day => {
+                    const schedule = editedCategory.schedules[day.id] || { enabled: false, start_time: '08:00', duration: 30, rotation_type: 'fixed', rotation_weeks: 1, start_date: new Date().toISOString().split('T')[0] }
+                    const isAlternated = schedule.rotation_type === 'alternated'
+
+                    return (
+                        <div key={day.id} className={`premium-card p-4 transition-all ${schedule.enabled ? 'border-primary/20 bg-primary/5' : 'opacity-60 grayscale'}`}>
+                            <div className="flex flex-col xl:flex-row gap-4 xl:items-center">
+                                <div className="min-w-[120px] flex items-center gap-3">
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
+                                        checked={schedule.enabled}
+                                        onChange={(e) => updateDay(day.id, { enabled: e.target.checked })}
+                                    />
+                                    <span className="font-bold text-slate-700">{day.label}</span>
+                                </div>
+
+                                {schedule.enabled && (
+                                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        <div>
+                                            <label className="text-[10px] uppercase font-bold text-slate-400">Inicio</label>
+                                            <Input
+                                                type="time"
+                                                value={schedule.start_time}
+                                                onChange={(e) => updateDay(day.id, { start_time: e.target.value })}
+                                                className="h-9 text-xs"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] uppercase font-bold text-slate-400">Duración (min)</label>
+                                            <Input
+                                                type="number"
+                                                value={schedule.duration}
+                                                onChange={(e) => updateDay(day.id, { duration: parseInt(e.target.value) })}
+                                                className="h-9 text-xs"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] uppercase font-bold text-slate-400">Rotación</label>
+                                            <select
+                                                className="w-full h-9 rounded-xl border-slate-200 bg-white text-xs font-bold text-slate-700"
+                                                value={schedule.rotation_type}
+                                                onChange={(e) => updateDay(day.id, { rotation_type: e.target.value as any })}
+                                            >
+                                                <option value="fixed">Semanal (Fijo)</option>
+                                                <option value="alternated">Alternado</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Alternated Specific Config */}
+                                        {isAlternated && (
+                                            <div className="flex gap-2">
+                                                <div className="flex-1">
+                                                    <label className="text-[10px] uppercase font-bold text-slate-400">cada (sem)</label>
+                                                    <Input
+                                                        type="number"
+                                                        min={2}
+                                                        value={schedule.rotation_weeks}
+                                                        onChange={(e) => updateDay(day.id, { rotation_weeks: parseInt(e.target.value) })}
+                                                        className="h-9 text-xs"
+                                                    />
+                                                </div>
+                                                <div className="flex-[2]">
+                                                    <label className="text-[10px] uppercase font-bold text-slate-400">Desde (Fecha A)</label>
+                                                    <Input
+                                                        type="date"
+                                                        value={schedule.start_date || ''}
+                                                        onChange={(e) => updateDay(day.id, { start_date: e.target.value })}
+                                                        className="h-9 text-xs"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}

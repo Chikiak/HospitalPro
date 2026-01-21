@@ -13,8 +13,15 @@ export default function Register() {
         try {
             setError(null)
             await register(data)
-            // Redirect to complete profile on successful registration
-            navigate('/registro/completar-perfil')
+
+            const userStr = localStorage.getItem('user')
+            const user = userStr ? JSON.parse(userStr) : null
+
+            if (user?.role === 'patient') {
+                navigate('/registro/paso2')
+            } else {
+                navigate('/')
+            }
         } catch (err) {
             const error = err as { response?: { data?: { detail?: string } } }
             if (error.response?.data?.detail) {

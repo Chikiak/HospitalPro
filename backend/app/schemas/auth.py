@@ -1,10 +1,12 @@
 from pydantic import BaseModel, Field
+from app.schemas.user import UserResponse
 
 
 class Token(BaseModel):
     """Schema for access token response."""
     access_token: str
     token_type: str = "bearer"
+    user: UserResponse
 
 
 class LoginRequest(BaseModel):

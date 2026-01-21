@@ -9,7 +9,6 @@ from app.models.appointment import AppointmentStatus
 class AppointmentCreate(BaseModel):
     """Schema for creating an appointment."""
     patient_id: int = Field(..., description="Patient user ID")
-    doctor_id: int = Field(..., description="Doctor user ID")
     appointment_date: datetime = Field(..., description="Appointment date and time")
     specialty: Optional[str] = Field(None, max_length=100, description="Medical specialty")
     notes: Optional[str] = Field(None, max_length=500, description="Appointment notes")
@@ -28,7 +27,6 @@ class AppointmentResponse(BaseModel):
     
     id: int
     patient_id: int
-    doctor_id: int
     appointment_date: datetime
     status: AppointmentStatus
     specialty: Optional[str]
@@ -37,8 +35,6 @@ class AppointmentResponse(BaseModel):
 
 class AvailableSlot(BaseModel):
     """Schema for available appointment slot."""
-    doctor_id: int
-    doctor_name: str
     specialty: str
     appointment_date: datetime
     available: bool = True
@@ -46,7 +42,14 @@ class AvailableSlot(BaseModel):
 
 class BookAppointmentRequest(BaseModel):
     """Schema for booking an appointment."""
-    doctor_id: int = Field(..., description="Doctor user ID")
+    category_id: int = Field(..., description="Category schedule ID")
     appointment_date: datetime = Field(..., description="Appointment date and time")
-    specialty: str = Field(..., max_length=100, description="Medical specialty")
+    category_name: str = Field(..., max_length=100, description="Name of the category")
     notes: Optional[str] = Field(None, max_length=500, description="Appointment notes")
+
+
+class TimeSlotResponse(BaseModel):
+    """Schema for time slot response."""
+    slot_datetime: datetime
+    category_name: str
+    category_id: int

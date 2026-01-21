@@ -22,7 +22,6 @@ class Appointment(Base):
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    doctor_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     appointment_date: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
     status: Mapped[AppointmentStatus] = mapped_column(
         Enum(AppointmentStatus), 
@@ -32,5 +31,5 @@ class Appointment(Base):
     specialty: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     notes: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     
-    # Relationships to User model (patient and doctor)
+    # Relationships to User model (patient)
     # Note: We don't define the back_populates here to avoid modifying the existing User model

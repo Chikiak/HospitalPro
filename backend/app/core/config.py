@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     STAFF_PASSWORD: str = ""  # Must be set for staff authentication to work
+    ADMIN_PASSWORD: str = "admin1234"  # Default admin password for sensitive operations
     
     @property
     def DATABASE_URL(self) -> str:

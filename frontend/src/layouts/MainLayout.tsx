@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { HeartPulse, LayoutDashboard, Calendar, LogOut, Bell, Search, User, FileText, Download } from 'lucide-react'
+import { HeartPulse, LayoutDashboard, Calendar, LogOut, Bell, Search, User } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '../lib/utils'
 import { useAuth } from '../context/AuthContext'
@@ -21,9 +21,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   // Navigation for staff
   const staffNav = [
-    { label: 'Calendario', icon: Calendar, path: '/calendar' },
-    { label: 'Gestión de Bloques', icon: FileText, path: '/blocks' },
-    { label: 'Exportar', icon: Download, path: '/export' },
+    { label: 'Inicio', icon: LayoutDashboard, path: '/' },
+    { label: 'Calendario', icon: Calendar, path: '/admin/calendar' },
+    { label: 'Configuración', icon: HeartPulse, path: '/admin/settings' },
   ]
 
   // Select navigation based on user role
@@ -78,7 +78,14 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <div className="h-full w-[65%] bg-primary rounded-full shadow-[0_0_10px_rgba(20,184,166,0.5)]"></div>
             </div>
           </div>
-          <button className="flex items-center gap-4 px-5 py-4 rounded-2xl text-slate-400 font-bold text-sm hover:text-rose-400 hover:bg-rose-400/10 transition-all w-full">
+          <button
+            onClick={() => {
+              localStorage.removeItem('access_token')
+              localStorage.removeItem('user')
+              window.location.href = '/login'
+            }}
+            className="flex items-center gap-4 px-5 py-4 rounded-2xl text-slate-400 font-bold text-sm hover:text-rose-400 hover:bg-rose-400/10 transition-all w-full"
+          >
             <LogOut className="h-5 w-5" />
             <span>Cerrar Sesión</span>
           </button>

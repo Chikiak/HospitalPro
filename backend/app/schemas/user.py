@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.user import UserRole
 
@@ -20,6 +20,15 @@ class UserResponse(BaseModel):
     full_name: str
     role: UserRole
     is_active: bool
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, v):
+        if isinstance(v, str):
+            return v.lower()
+        if hasattr(v, "value"):
+            return v.value.lower()
+        return v
 
 
 class StaffLoginRequest(BaseModel):

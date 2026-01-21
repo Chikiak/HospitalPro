@@ -46,7 +46,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (storedUser && token) {
       try {
-        return JSON.parse(storedUser)
+        const parsedUser = JSON.parse(storedUser)
+        // Normalize role to lowercase
+        if (parsedUser && parsedUser.role) {
+          parsedUser.role = parsedUser.role.toLowerCase()
+        }
+        return parsedUser
       } catch (error) {
         console.error('Failed to parse stored user:', error)
         localStorage.removeItem('user')
@@ -65,21 +70,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       })
 
-      const { access_token } = response.data
+      const { access_token, user: userProfile } = response.data
+
+      // Normalize role to lowercase
+      if (userProfile && userProfile.role) {
+        userProfile.role = userProfile.role.toLowerCase()
+      }
 
       // Store token
       localStorage.setItem('access_token', access_token)
-
-      // TODO: Ideally, the backend should return user profile in login response
-      // or provide a /me endpoint to fetch user info after login.
-      // For now, we create a minimal user object with available data.
-      const userProfile: User = {
-        id: 0,
-        dni,
-        full_name: 'Usuario',
-        role: 'patient',
-        is_active: true,
-      }
 
       localStorage.setItem('user', JSON.stringify(userProfile))
       setUser(userProfile)
@@ -118,20 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       })
 
-      const { access_token } = response.data
-
-      // Store token
-      localStorage.setItem('access_token', access_token)
-
-      // Create staff user profile
-      const userProfile: User = {
-        id: 0,
-        dni: null,
-        full_name: 'Personal',
-        role: 'staff',
-        is_active: true,
+      const { access_token, user: userProfile } = response.data
+      // Normalize role to lowercase
+      if (userProfile && userProfile.role) {
+        userProfile.role = userProfile.role.toLowerCase()
       }
 
+      localStorage.setItem('access_token', access_token)
       localStorage.setItem('user', JSON.stringify(userProfile))
       setUser(userProfile)
     } catch (error) {

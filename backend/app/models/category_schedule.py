@@ -1,7 +1,7 @@
 import enum
-from datetime import time
+from datetime import time, date as dt_date
 
-from sqlalchemy import Enum, Integer, String, Time
+from sqlalchemy import Enum, Integer, String, Time, Date
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -32,3 +32,4 @@ class CategorySchedule(Base):
     max_turns_per_block: Mapped[int] = mapped_column(Integer, nullable=False)
     rotation_type: Mapped[RotationType] = mapped_column(Enum(RotationType), nullable=False)
     rotation_weeks: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    start_date: Mapped[dt_date] = mapped_column(Date, nullable=True) # Anchor date for rotation logic

@@ -11,16 +11,18 @@ interface Appointment {
   id: string
   patient_name: string
   specialty: string
-  doctor_name: string
-  date: string
-  status: 'confirmed' | 'pending' | 'completed'
+  doctor_name?: string
+  appointment_date: string
+  status: 'confirmed' | 'pending' | 'completed' | 'scheduled'
+  notes?: string
 }
 
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  
-  const { data: appointments = [], isLoading } = useQuery<Appointment[]>({
+
+  // Patient Appointments
+  const { data: patientAppointments = [], isLoading: isLoadingPatient } = useQuery<Appointment[]>({
     queryKey: ['appointments', 'me'],
     queryFn: async () => {
       try {
@@ -31,12 +33,35 @@ export default function Dashboard() {
         return []
       }
     },
+    enabled: !!user && user.role === 'patient',
   })
+
+  // Staff Appointments (All future)
+  const { data: staffAppointments = [], isLoading: isLoadingStaff } = useQuery<Appointment[]>({
+    queryKey: ['appointments', 'all', 'future'],
+    queryFn: async () => {
+      try {
+        const d = new Date()
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        const response = await api.get('/appointments/all', {
+          params: { start_date: today }
+        })
+        return Array.isArray(response.data) ? response.data : []
+      } catch (error) {
+        console.warn('API not available:', error)
+        return []
+      }
+    },
+    enabled: !!user && ['admin', 'doctor', 'staff'].includes(user.role),
+  })
+
+  const appointments = user?.role === 'patient' ? patientAppointments : staffAppointments
+  const isLoading = user?.role === 'patient' ? isLoadingPatient : isLoadingStaff
 
   // Filter to show only future appointments
   const futureAppointments = useMemo(() => {
     return appointments.filter(appointment => {
-      const appointmentDate = new Date(appointment.date)
+      const appointmentDate = new Date(appointment.appointment_date)
       return appointmentDate > new Date()
     })
   }, [appointments])
@@ -76,6 +101,21 @@ export default function Dashboard() {
     }
   }
 
+  const handleCancel = async (appointmentId: string) => {
+    if (!window.confirm('¿Está seguro que desea cancelar este turno?')) {
+      return
+    }
+
+    try {
+      await api.put(`/appointments/${appointmentId}/cancel`)
+      // Refetch appointments
+      window.location.reload()
+    } catch (error) {
+      console.error('Error cancelling appointment:', error)
+      alert('Error al cancelar el turno')
+    }
+  }
+
   // If user is a patient, show appointment booking as primary action
   if (user?.role === 'patient') {
     return (
@@ -88,7 +128,7 @@ export default function Dashboard() {
             </h1>
             <p className="text-slate-500 font-medium">Gestiona tus citas médicas.</p>
           </div>
-          <Button 
+          <Button
             onClick={() => navigate('/appointments/new')}
             className="flex items-center gap-2"
           >
@@ -115,7 +155,7 @@ export default function Dashboard() {
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
                 <Calendar className="h-16 w-16 text-slate-300" />
                 <p className="text-slate-500 font-medium">No tienes turnos programados</p>
-                <Button 
+                <Button
                   onClick={() => navigate('/appointments/new')}
                   variant="outline"
                   className="mt-4"
@@ -137,22 +177,32 @@ export default function Dashboard() {
                       <div>
                         <p className="font-bold text-slate-900 group-hover:text-primary transition-colors">{appointment.specialty}</p>
                         <p className="text-xs font-medium text-slate-500">
-                          {appointment.doctor_name}
+                          Programado para atención
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end gap-6 mt-4 sm:mt-0">
                       <div className="text-right">
-                        <p className="text-sm font-black text-slate-900">{formatDate(appointment.date)}</p>
-                        <p className="text-xs font-medium text-slate-500">{formatTime(appointment.date)}</p>
+                        <p className="text-sm font-black text-slate-900">{formatDate(appointment.appointment_date)}</p>
+                        <p className="text-xs font-medium text-slate-500">{formatTime(appointment.appointment_date)}</p>
                       </div>
-                      <span
-                        className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm ${getStatusBadgeClass(
-                          appointment.status
-                        )}`}
-                      >
-                        {getStatusLabel(appointment.status)}
-                      </span>
+                      <div className="flex flex-col items-end gap-2">
+                        <span
+                          className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm ${getStatusBadgeClass(
+                            appointment.status
+                          )}`}
+                        >
+                          {getStatusLabel(appointment.status)}
+                        </span>
+                        {(appointment.status === 'scheduled' || appointment.status === 'confirmed') && (
+                          <button
+                            onClick={() => handleCancel(appointment.id)}
+                            className="text-xs text-red-500 font-bold hover:underline hover:text-red-600 transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -163,6 +213,8 @@ export default function Dashboard() {
       </div>
     )
   }
+
+
 
   // For non-patient users (admin, doctor, staff), show a different view
   return (
@@ -181,8 +233,8 @@ export default function Dashboard() {
       <div className="premium-card !p-0 overflow-hidden border-none shadow-xl bg-white">
         <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
           <div>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">Próximos Turnos</h2>
-            <p className="text-sm font-medium text-slate-500">Listado de citas programadas</p>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Turnos de Hoy</h2>
+            <p className="text-sm font-medium text-slate-500">Agenda del día</p>
           </div>
         </div>
         <div className="p-4">
@@ -194,7 +246,9 @@ export default function Dashboard() {
           ) : futureAppointments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 space-y-4">
               <Calendar className="h-16 w-16 text-slate-300" />
-              <p className="text-slate-500 font-medium">No hay turnos programados</p>
+              <p className="text-slate-500 font-medium">
+                No hay turnos para hoy
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
@@ -210,14 +264,14 @@ export default function Dashboard() {
                     <div>
                       <p className="font-bold text-slate-900 group-hover:text-primary transition-colors">{appointment.patient_name}</p>
                       <p className="text-xs font-medium text-slate-500">
-                        {appointment.specialty} • {appointment.doctor_name}
+                        {appointment.specialty}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between sm:justify-end gap-6 mt-4 sm:mt-0">
                     <div className="text-right">
-                      <p className="text-sm font-black text-slate-900">{formatDate(appointment.date)}</p>
-                      <p className="text-xs font-medium text-slate-500">{formatTime(appointment.date)}</p>
+                      <p className="text-sm font-black text-slate-900">{formatDate(appointment.appointment_date)}</p>
+                      <p className="text-xs font-medium text-slate-500">{formatTime(appointment.appointment_date)}</p>
                     </div>
                     <span
                       className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm ${getStatusBadgeClass(

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, time as dt_time
-from typing import List
+from typing import List, Union, Optional
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,53 +32,76 @@ class ScheduleService:
     def __init__(self, session: AsyncSession):
         self.session = session
     
-    async def get_available_slots(
+    async def get_next_available_slots(
         self, 
-        category_id: int, 
-        date: datetime
+        category_name: str,
+        category_type: str,
+        limit: int = 3
     ) -> List[TimeSlot]:
         """
-        Get available time slots for a category on a specific date.
+        Get the next available time slots for a category.
         
         Args:
-            category_id: The ID of the category schedule
-            date: The date to check for available slots
-        
+            category_name: The name of the category
+            category_type: The type of the category
+            limit: Maximum number of slots to return (default 3)
+            
         Returns:
-            List of available TimeSlot objects
-        
-        Algorithm:
-        1. Fetch the category schedule by ID
-        2. Check if the schedule is active on the given date based on rotation logic:
-           - FIXED: Available every week
-           - ALTERNATED: Calculate week number from anchor date and check rotation
-        3. Generate time slots based on start_time, turn_duration, and max_turns_per_block
-        4. Filter out slots that are already occupied by appointments
+            List of the next available TimeSlot objects
         """
-        # Fetch category schedule
+        all_available_slots = []
+        start_date = datetime.now()
+        
+        # Fetch all schedules for this category name and type
         result = await self.session.execute(
-            select(CategorySchedule).where(CategorySchedule.id == category_id)
+            select(CategorySchedule).where(
+                and_(
+                    CategorySchedule.name == category_name,
+                    CategorySchedule.category_type == category_type
+                )
+            )
         )
-        category = result.scalar_one_or_none()
+        schedules = result.scalars().all()
         
-        if not category:
+        if not schedules:
             return []
+
+        # Optimize: Map day_of_week to schedules for faster lookup
+        schedules_by_day = {s.day_of_week: s for s in schedules}
+        valid_days = set(schedules_by_day.keys())
         
-        # Check if the date matches the day of week
-        if date.weekday() != category.day_of_week:
-            return []
+        # We'll search up to 60 days ahead to find slots (prevent infinite loop)
+        days_searched = 0
+        current_date_cursor = start_date
+
+        while len(all_available_slots) < limit and days_searched < 60:
+            # Check if current weekday is in our valid schedule days
+            if current_date_cursor.weekday() in valid_days:
+                category = schedules_by_day[current_date_cursor.weekday()]
+                
+                if self._is_schedule_active(category, current_date_cursor):
+                    slots = self._generate_slots(category, current_date_cursor)
+                    
+                    # Filter out past slots if looking at today
+                    if current_date_cursor.date() == datetime.now().date():
+                        now = datetime.now()
+                        slots = [s for s in slots if s.slot_datetime > now]
+                    
+                    if slots:
+                        available_slots = await self._filter_occupied_slots(slots, category.name)
+                        # BUG FIX: Only take the first available slot for this day
+                        if available_slots:
+                            all_available_slots.append(available_slots[0])
+            
+            # Move to next day
+            current_date_cursor += timedelta(days=1)
+            days_searched += 1
+            
+            # If we collected more than we need, trim list (though we append one by one now)
+            if len(all_available_slots) >= limit:
+                break
         
-        # Check rotation logic
-        if not self._is_schedule_active(category, date):
-            return []
-        
-        # Generate all possible slots for this block
-        slots = self._generate_slots(category, date)
-        
-        # Filter out occupied slots
-        available_slots = await self._filter_occupied_slots(slots, category.name)
-        
-        return available_slots
+        return all_available_slots
     
     def _is_schedule_active(self, category: CategorySchedule, date: datetime) -> bool:
         """
@@ -97,10 +120,17 @@ class ScheduleService:
         
         elif category.rotation_type == RotationType.ALTERNATED:
             # ALTERNATED schedules use week-based rotation
-            # Calculate week number from anchor date
-            days_since_anchor = (date.date() - self.ANCHOR_DATE.date()).days
+            # Use category-specific start date if available, otherwise fallback to global anchor
+            anchor_date = category.start_date if category.start_date else self.ANCHOR_DATE.date()
             
-            # For dates before anchor, treat as inactive (alternatively could raise an error)
+            # Ensure we are comparing dates
+            if isinstance(anchor_date, datetime):
+                anchor_date = anchor_date.date()
+                
+            # Calculate week number from anchor date
+            days_since_anchor = (date.date() - anchor_date).days
+            
+            # For dates before anchor, treat as inactive
             if days_since_anchor < 0:
                 return False
             
@@ -108,7 +138,9 @@ class ScheduleService:
             
             # Check if this week matches the rotation pattern
             # The schedule is active when: (current_week - anchor_week) % rotation_weeks == 0
-            return (weeks_since_anchor % category.rotation_weeks) == 0
+            if category.rotation_weeks > 1:
+                return (weeks_since_anchor % category.rotation_weeks) == 0
+            return True # Should not happen for alternating schedules with weeks=1, but fallback to True
         
         return False
     

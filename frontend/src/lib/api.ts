@@ -31,12 +31,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      console.warn('Unauthorized request (401). clearing session...');
       // Clear authentication data
       localStorage.removeItem('access_token')
       localStorage.removeItem('user')
-      
-      // Redirect to login page
-      window.location.href = '/login'
+
+      // Redirect to login page ONLY if not already there to avoid redirect loops
+      if (window.location.pathname !== '/login') {
+        console.warn('Redirecting to login...');
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

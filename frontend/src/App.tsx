@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import NewAppointment from './pages/appointments/NewAppointment'
 import AdminSettings from './pages/AdminSettings'
 import MainLayout from './layouts/MainLayout'
+import StaffCalendar from './pages/admin/StaffCalendar'
 import AppointmentSearch from './features/appointments/AppointmentSearch'
 
 function App() {
@@ -77,6 +78,16 @@ function App() {
             }
           />
           <Route
+            path="/admin/calendar"
+            element={
+              <RoleGuard allowedRoles={['admin', 'doctor', 'staff']}>
+                <MainLayout>
+                  <StaffCalendar />
+                </MainLayout>
+              </RoleGuard>
+            }
+          />
+          <Route
             path="/admin/*"
             element={
               <RoleGuard allowedRoles={['admin', 'doctor', 'staff']}>
@@ -109,8 +120,8 @@ function App() {
             }
           />
 
-          {/* Catch-all route */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* Catch-all route - redirect to home (root), which is guarded */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
