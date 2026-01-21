@@ -188,14 +188,22 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
     const [editedCategory, setEditedCategory] = useState<Category>(JSON.parse(JSON.stringify(category)))
     const [isSaving, setIsSaving] = useState(false)
     const isLaboratory = category.type === 'laboratory'
+    
+    // Default values based on category type - centralized to avoid duplication
+    const DEFAULT_LAB_MAX_TURNS = 10
+    const DEFAULT_SPECIALTY_MAX_TURNS = 1
+    const DEFAULT_LAB_DEADLINE = '09:00'
+    
+    const getDefaultMaxTurns = () => isLaboratory ? DEFAULT_LAB_MAX_TURNS : DEFAULT_SPECIALTY_MAX_TURNS
+    const getDefaultWarningMessage = (deadline: string = DEFAULT_LAB_DEADLINE) => 
+        isLaboratory ? `⚠️ IMPORTANTE: No recibimos muestras después de las ${deadline}. Debe presentarse temprano.` : undefined
 
     const updateDay = (dayId: number, changes: Partial<DaySchedule>) => {
         setEditedCategory(prev => {
             const next = { ...prev }
-            // Default values based on category type
-            const defaultMaxTurns = isLaboratory ? 10 : 1
-            const defaultDeadline = isLaboratory ? '09:00' : undefined
-            const defaultWarning = isLaboratory ? '⚠️ IMPORTANTE: No recibimos muestras después de las 9:00 AM. Debe presentarse a las 7:30 AM.' : undefined
+            const defaultMaxTurns = getDefaultMaxTurns()
+            const defaultDeadline = isLaboratory ? DEFAULT_LAB_DEADLINE : undefined
+            const defaultWarning = getDefaultWarningMessage(defaultDeadline)
             
             const current = next.schedules[dayId] || {
                 enabled: false,
@@ -220,6 +228,7 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
         try {
             const pass = await adminPasswordProvider()
             setIsSaving(true)
+            const defaultMaxTurns = getDefaultMaxTurns()
 
             const promises = Object.values(editedCategory.schedules).map(sch => {
                 if (!sch.enabled) return Promise.resolve()
@@ -231,7 +240,7 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
                     day_of_week: sch.day_of_week,
                     start_time: sch.start_time,
                     turn_duration: sch.duration,
-                    max_turns_per_block: sch.max_turns || (isLaboratory ? 10 : 1),
+                    max_turns_per_block: sch.max_turns || defaultMaxTurns,
                     rotation_type: sch.rotation_type,
                     rotation_weeks: sch.rotation_weeks,
                     start_date: sch.rotation_type === 'alternated' ? sch.start_date : null,
@@ -285,7 +294,9 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
 
             <div className="grid gap-6">
                 {DAYS.map(day => {
-                    const defaultMaxTurns = isLaboratory ? 10 : 1
+                    const defaultMaxTurns = getDefaultMaxTurns()
+                    const defaultDeadline = isLaboratory ? DEFAULT_LAB_DEADLINE : undefined
+                    const defaultWarning = getDefaultWarningMessage(defaultDeadline)
                     const schedule = editedCategory.schedules[day.id] || { 
                         enabled: false, 
                         start_time: '08:00', 
@@ -294,8 +305,8 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
                         rotation_type: 'fixed', 
                         rotation_weeks: 1, 
                         start_date: new Date().toISOString().split('T')[0],
-                        deadline_time: isLaboratory ? '09:00' : undefined,
-                        warning_message: isLaboratory ? '⚠️ IMPORTANTE: No recibimos muestras después de las 9:00 AM. Debe presentarse a las 7:30 AM.' : undefined
+                        deadline_time: defaultDeadline,
+                        warning_message: defaultWarning
                     }
                     const isAlternated = schedule.rotation_type === 'alternated'
 

@@ -24,9 +24,10 @@ async def create_or_update_schedule(
     Create or update a category schedule block.
     
     This endpoint enforces a unique constraint: only one schedule block is allowed
-    per combination of category_type and day_of_week.
+    per combination of category name and day_of_week. This allows multiple 
+    specialties or laboratories to operate on the same day.
     
-    If a schedule already exists for the given category_type and day_of_week,
+    If a schedule already exists for the given category name and day_of_week,
     it will be updated with the new data. Otherwise, a new schedule is created.
     
     Args:
