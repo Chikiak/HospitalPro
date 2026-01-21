@@ -11,10 +11,13 @@ from app.models.appointment import Appointment, AppointmentStatus
 class TimeSlot:
     """Represents an available time slot."""
     
-    def __init__(self, slot_datetime: datetime, category_name: str, category_id: int):
+    def __init__(self, slot_datetime: datetime, category_name: str, category_id: int, 
+                 warning_message: str = None, deadline_time: str = None):
         self.slot_datetime = slot_datetime
         self.category_name = category_name
         self.category_id = category_id
+        self.warning_message = warning_message
+        self.deadline_time = deadline_time
     
     def __repr__(self):
         return f"TimeSlot(datetime={self.slot_datetime}, category={self.category_name})"
@@ -160,12 +163,18 @@ class ScheduleService:
         # Combine date with start time
         current_time = datetime.combine(date.date(), category.start_time)
         
+        # Get warning message and deadline time from category
+        warning_message = category.warning_message
+        deadline_time = category.deadline_time.strftime("%H:%M") if category.deadline_time else None
+        
         # Generate slots by adding turn_duration repeatedly
         for turn_number in range(category.max_turns_per_block):
             slot = TimeSlot(
                 slot_datetime=current_time,
                 category_name=category.name,
-                category_id=category.id
+                category_id=category.id,
+                warning_message=warning_message,
+                deadline_time=deadline_time
             )
             slots.append(slot)
             

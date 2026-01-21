@@ -53,3 +53,5 @@ class TimeSlotResponse(BaseModel):
     slot_datetime: datetime
     category_name: str
     category_id: int
+    warning_message: Optional[str] = None
+    deadline_time: Optional[str] = None

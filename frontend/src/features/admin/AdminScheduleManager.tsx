@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Clock, Save, ArrowLeft } from 'lucide-react'
+import { Plus, Clock, Save, ArrowLeft, AlertTriangle } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import api from '../../lib/api'
@@ -11,9 +11,12 @@ interface DaySchedule {
     day_of_week: number
     start_time: string
     duration: number
+    max_turns: number
     rotation_type: 'fixed' | 'alternated'
     rotation_weeks: number
     start_date?: string // New field for rotation anchor
+    deadline_time?: string // Deadline time for sample collection (for labs)
+    warning_message?: string // Warning message to display to patients
 }
 
 interface Category {
@@ -67,9 +70,12 @@ export default function AdminScheduleManager({ adminPasswordProvider }: AdminSch
                     day_of_week: item.day_of_week,
                     start_time: item.start_time.substring(0, 5),
                     duration: item.turn_duration,
+                    max_turns: item.max_turns_per_block,
                     rotation_type: item.rotation_type,
                     rotation_weeks: item.rotation_weeks,
-                    start_date: item.start_date
+                    start_date: item.start_date,
+                    deadline_time: item.deadline_time?.substring(0, 5),
+                    warning_message: item.warning_message
                 }
             })
 
@@ -181,18 +187,27 @@ export default function AdminScheduleManager({ adminPasswordProvider }: AdminSch
 function CategoryEditor({ category, onBack, adminPasswordProvider }: { category: Category, onBack: () => void, adminPasswordProvider: () => Promise<string> }) {
     const [editedCategory, setEditedCategory] = useState<Category>(JSON.parse(JSON.stringify(category)))
     const [isSaving, setIsSaving] = useState(false)
+    const isLaboratory = category.type === 'laboratory'
 
     const updateDay = (dayId: number, changes: Partial<DaySchedule>) => {
         setEditedCategory(prev => {
             const next = { ...prev }
+            // Default values based on category type
+            const defaultMaxTurns = isLaboratory ? 10 : 1
+            const defaultDeadline = isLaboratory ? '09:00' : undefined
+            const defaultWarning = isLaboratory ? '⚠️ IMPORTANTE: No recibimos muestras después de las 9:00 AM. Debe presentarse a las 7:30 AM.' : undefined
+            
             const current = next.schedules[dayId] || {
                 enabled: false,
                 day_of_week: dayId,
                 start_time: '08:00',
                 duration: 30,
+                max_turns: defaultMaxTurns,
                 rotation_type: 'fixed',
                 rotation_weeks: 1,
-                start_date: new Date().toISOString().split('T')[0]
+                start_date: new Date().toISOString().split('T')[0],
+                deadline_time: defaultDeadline,
+                warning_message: defaultWarning
             }
             // If we are enabling, ensure object exists. If disabling, we keep it but mark enabled=false
             next.schedules[dayId] = { ...current, ...changes }
@@ -207,19 +222,21 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
             setIsSaving(true)
 
             const promises = Object.values(editedCategory.schedules).map(sch => {
-                if (!sch.enabled) return Promise.resolve() // Or delete if needed? Current API doesn't have delete-by-day easily, just update. Ideally strict "sync".
+                if (!sch.enabled) return Promise.resolve()
 
                 return api.post('/admin/schedules', {
                     admin_password: pass,
                     category_type: category.type,
                     name: category.name,
                     day_of_week: sch.day_of_week,
-                    start_time: sch.start_time, // Ensure HH:MM format
+                    start_time: sch.start_time,
                     turn_duration: sch.duration,
-                    max_turns_per_block: Math.floor(240 / sch.duration), // Simple heuristic: 4 hours block
+                    max_turns_per_block: sch.max_turns || (isLaboratory ? 10 : 1),
                     rotation_type: sch.rotation_type,
                     rotation_weeks: sch.rotation_weeks,
-                    start_date: sch.rotation_type === 'alternated' ? sch.start_date : null
+                    start_date: sch.rotation_type === 'alternated' ? sch.start_date : null,
+                    deadline_time: sch.deadline_time || null,
+                    warning_message: sch.warning_message || null
                 })
             })
 
@@ -242,6 +259,9 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
                 <h2 className="text-2xl font-black text-slate-800">
                     Editar: <span className="text-primary">{category.name}</span>
                 </h2>
+                <span className="text-xs font-bold uppercase text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                    {category.type === 'specialty' ? 'Especialidad' : 'Laboratorio'}
+                </span>
                 <div className="flex-1"></div>
                 <Button onClick={handleSave} isLoading={isSaving} className="shadow-lg shadow-primary/20">
                     <Save size={18} className="mr-2" />
@@ -249,77 +269,141 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
                 </Button>
             </div>
 
+            {/* Info banner for laboratory */}
+            {isLaboratory && (
+                <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <p className="font-bold text-amber-800">Configuración de Laboratorio</p>
+                        <p className="text-sm text-amber-700">
+                            Los laboratorios tienen límite de turnos diarios y hora límite de recepción de muestras. 
+                            Configure estos parámetros según las necesidades del servicio.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div className="grid gap-6">
                 {DAYS.map(day => {
-                    const schedule = editedCategory.schedules[day.id] || { enabled: false, start_time: '08:00', duration: 30, rotation_type: 'fixed', rotation_weeks: 1, start_date: new Date().toISOString().split('T')[0] }
+                    const defaultMaxTurns = isLaboratory ? 10 : 1
+                    const schedule = editedCategory.schedules[day.id] || { 
+                        enabled: false, 
+                        start_time: '08:00', 
+                        duration: 30, 
+                        max_turns: defaultMaxTurns,
+                        rotation_type: 'fixed', 
+                        rotation_weeks: 1, 
+                        start_date: new Date().toISOString().split('T')[0],
+                        deadline_time: isLaboratory ? '09:00' : undefined,
+                        warning_message: isLaboratory ? '⚠️ IMPORTANTE: No recibimos muestras después de las 9:00 AM. Debe presentarse a las 7:30 AM.' : undefined
+                    }
                     const isAlternated = schedule.rotation_type === 'alternated'
 
                     return (
                         <div key={day.id} className={`premium-card p-4 transition-all ${schedule.enabled ? 'border-primary/20 bg-primary/5' : 'opacity-60 grayscale'}`}>
-                            <div className="flex flex-col xl:flex-row gap-4 xl:items-center">
-                                <div className="min-w-[120px] flex items-center gap-3">
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-3">
                                     <input
                                         type="checkbox"
                                         className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
                                         checked={schedule.enabled}
                                         onChange={(e) => updateDay(day.id, { enabled: e.target.checked })}
                                     />
-                                    <span className="font-bold text-slate-700">{day.label}</span>
+                                    <span className="font-bold text-slate-700 min-w-[100px]">{day.label}</span>
                                 </div>
 
                                 {schedule.enabled && (
-                                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        <div>
-                                            <label className="text-[10px] uppercase font-bold text-slate-400">Inicio</label>
-                                            <Input
-                                                type="time"
-                                                value={schedule.start_time}
-                                                onChange={(e) => updateDay(day.id, { start_time: e.target.value })}
-                                                className="h-9 text-xs"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] uppercase font-bold text-slate-400">Duración (min)</label>
-                                            <Input
-                                                type="number"
-                                                value={schedule.duration}
-                                                onChange={(e) => updateDay(day.id, { duration: parseInt(e.target.value) })}
-                                                className="h-9 text-xs"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] uppercase font-bold text-slate-400">Rotación</label>
-                                            <select
-                                                className="w-full h-9 rounded-xl border-slate-200 bg-white text-xs font-bold text-slate-700"
-                                                value={schedule.rotation_type}
-                                                onChange={(e) => updateDay(day.id, { rotation_type: e.target.value as any })}
-                                            >
-                                                <option value="fixed">Semanal (Fijo)</option>
-                                                <option value="alternated">Alternado</option>
-                                            </select>
-                                        </div>
+                                    <div className="space-y-4 pl-8">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                                            <div>
+                                                <label className="text-[10px] uppercase font-bold text-slate-400">Hora Inicio</label>
+                                                <Input
+                                                    type="time"
+                                                    value={schedule.start_time}
+                                                    onChange={(e) => updateDay(day.id, { start_time: e.target.value })}
+                                                    className="h-9 text-xs"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] uppercase font-bold text-slate-400">Duración (min)</label>
+                                                <Input
+                                                    type="number"
+                                                    value={schedule.duration}
+                                                    onChange={(e) => updateDay(day.id, { duration: parseInt(e.target.value) })}
+                                                    className="h-9 text-xs"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] uppercase font-bold text-slate-400">Turnos Máx.</label>
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    value={schedule.max_turns || defaultMaxTurns}
+                                                    onChange={(e) => updateDay(day.id, { max_turns: parseInt(e.target.value) })}
+                                                    className="h-9 text-xs"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] uppercase font-bold text-slate-400">Rotación</label>
+                                                <select
+                                                    className="w-full h-9 rounded-xl border-slate-200 bg-white text-xs font-bold text-slate-700"
+                                                    value={schedule.rotation_type}
+                                                    onChange={(e) => updateDay(day.id, { rotation_type: e.target.value as any })}
+                                                >
+                                                    <option value="fixed">Semanal (Fijo)</option>
+                                                    <option value="alternated">Alternado</option>
+                                                </select>
+                                            </div>
 
-                                        {/* Alternated Specific Config */}
-                                        {isAlternated && (
-                                            <div className="flex gap-2">
-                                                <div className="flex-1">
-                                                    <label className="text-[10px] uppercase font-bold text-slate-400">cada (sem)</label>
-                                                    <Input
-                                                        type="number"
-                                                        min={2}
-                                                        value={schedule.rotation_weeks}
-                                                        onChange={(e) => updateDay(day.id, { rotation_weeks: parseInt(e.target.value) })}
-                                                        className="h-9 text-xs"
-                                                    />
-                                                </div>
-                                                <div className="flex-[2]">
-                                                    <label className="text-[10px] uppercase font-bold text-slate-400">Desde (Fecha A)</label>
-                                                    <Input
-                                                        type="date"
-                                                        value={schedule.start_date || ''}
-                                                        onChange={(e) => updateDay(day.id, { start_date: e.target.value })}
-                                                        className="h-9 text-xs"
-                                                    />
+                                            {/* Alternated Specific Config */}
+                                            {isAlternated && (
+                                                <>
+                                                    <div>
+                                                        <label className="text-[10px] uppercase font-bold text-slate-400">Cada (sem)</label>
+                                                        <Input
+                                                            type="number"
+                                                            min={2}
+                                                            value={schedule.rotation_weeks}
+                                                            onChange={(e) => updateDay(day.id, { rotation_weeks: parseInt(e.target.value) })}
+                                                            className="h-9 text-xs"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] uppercase font-bold text-slate-400">Desde (Fecha)</label>
+                                                        <Input
+                                                            type="date"
+                                                            value={schedule.start_date || ''}
+                                                            onChange={(e) => updateDay(day.id, { start_date: e.target.value })}
+                                                            className="h-9 text-xs"
+                                                        />
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Laboratory specific fields */}
+                                        {isLaboratory && (
+                                            <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-[10px] uppercase font-bold text-amber-700">Hora Límite Muestras</label>
+                                                        <Input
+                                                            type="time"
+                                                            value={schedule.deadline_time || '09:00'}
+                                                            onChange={(e) => updateDay(day.id, { deadline_time: e.target.value })}
+                                                            className="h-9 text-xs border-amber-200"
+                                                        />
+                                                    </div>
+                                                    <div className="sm:col-span-1">
+                                                        <label className="text-[10px] uppercase font-bold text-amber-700">Mensaje de Aviso</label>
+                                                        <Input
+                                                            type="text"
+                                                            value={schedule.warning_message || ''}
+                                                            placeholder="Ej: Debe presentarse a las 7:30 AM"
+                                                            onChange={(e) => updateDay(day.id, { warning_message: e.target.value })}
+                                                            className="h-9 text-xs border-amber-200"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}

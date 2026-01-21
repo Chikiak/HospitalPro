@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '../../lib/api'
 import Button from '../../components/ui/Button'
-import { Check, ChevronLeft, Clock, Stethoscope, ArrowRight, ShieldCheck, FlaskConical } from 'lucide-react'
+import { Check, ChevronLeft, Clock, Stethoscope, ArrowRight, ShieldCheck, FlaskConical, AlertTriangle } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import Tabs from '../../components/ui/Tabs'
 
@@ -11,6 +11,8 @@ interface TimeSlot {
   slot_datetime: string
   category_name: string
   category_id: number
+  warning_message?: string
+  deadline_time?: string
 }
 
 interface Category {
@@ -258,6 +260,23 @@ export default function NewAppointment() {
                 <ChevronLeft className="h-4 w-4 mr-1" /> VOLVER
               </Button>
             </div>
+            
+            {/* Warning message for laboratories */}
+            {turns.length > 0 && turns[0].warning_message && (
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+                <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-800 text-sm uppercase tracking-wide">Aviso Importante</p>
+                  <p className="text-amber-700 font-medium mt-1">{turns[0].warning_message}</p>
+                  {turns[0].deadline_time && (
+                    <p className="text-amber-600 text-sm mt-2 font-bold">
+                      ⏰ Hora límite de recepción: {turns[0].deadline_time}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            
             {turnsLoading ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
                 <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
@@ -319,7 +338,7 @@ export default function NewAppointment() {
                   </div>
                   <div className="space-y-1 text-right">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tipo de Turno</p>
-                    <p className="text-lg font-bold text-slate-900 capitalize">{activeType === 'specialty' ? 'Especialidad' : 'Análisis'}</p>
+                    <p className="text-lg font-bold text-slate-900 capitalize">{activeType === 'specialty' ? 'Especialidad' : 'Laboratorio'}</p>
                   </div>
                 </div>
 
@@ -329,6 +348,17 @@ export default function NewAppointment() {
                     {selectedTurn && formatDate(selectedTurn.slot_datetime)} - {selectedTurn && formatTime(selectedTurn.slot_datetime)}
                   </p>
                 </div>
+                
+                {/* Warning message for laboratory appointments in confirmation step */}
+                {selectedTurn?.warning_message && (
+                  <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-800 text-sm">Recordatorio Importante</p>
+                      <p className="text-amber-700 text-sm mt-1">{selectedTurn.warning_message}</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
                   <Button variant="outline" onClick={handleBack} className="flex-1 !py-4 font-black tracking-widest text-xs uppercase">
