@@ -18,6 +18,8 @@ class CategoryScheduleCreate(BaseModel):
     rotation_type: RotationType = Field(..., description="Type of rotation (fixed or alternated)")
     rotation_weeks: int = Field(default=1, ge=1, description="Number of weeks in rotation cycle")
     start_date: Optional[date] = Field(None, description="Anchor date for rotation (Week A start)")
+    deadline_time: Optional[time] = Field(None, description="Deadline time for sample collection (e.g., 09:00 for labs)")
+    warning_message: Optional[str] = Field(None, max_length=500, description="Warning message to show to patients")
 
 
 class CategoryScheduleUpdate(BaseModel):
@@ -29,6 +31,8 @@ class CategoryScheduleUpdate(BaseModel):
     rotation_type: Optional[RotationType] = Field(None, description="Type of rotation (fixed or alternated)")
     rotation_weeks: Optional[int] = Field(None, ge=1, description="Number of weeks in rotation cycle")
     start_date: Optional[date] = Field(None, description="Anchor date for rotation (Week A start)")
+    deadline_time: Optional[time] = Field(None, description="Deadline time for sample collection")
+    warning_message: Optional[str] = Field(None, max_length=500, description="Warning message to show to patients")
 
 
 class CategoryScheduleResponse(BaseModel):
@@ -45,3 +49,5 @@ class CategoryScheduleResponse(BaseModel):
     rotation_type: RotationType
     rotation_weeks: int
     start_date: Optional[date] = None
+    deadline_time: Optional[time] = None
+    warning_message: Optional[str] = None

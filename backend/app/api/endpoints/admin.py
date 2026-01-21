@@ -24,9 +24,10 @@ async def create_or_update_schedule(
     Create or update a category schedule block.
     
     This endpoint enforces a unique constraint: only one schedule block is allowed
-    per combination of category_type and day_of_week.
+    per combination of category name and day_of_week. This allows multiple 
+    specialties or laboratories to operate on the same day.
     
-    If a schedule already exists for the given category_type and day_of_week,
+    If a schedule already exists for the given category name and day_of_week,
     it will be updated with the new data. Otherwise, a new schedule is created.
     
     Args:
@@ -41,10 +42,10 @@ async def create_or_update_schedule(
     from app.schemas.security import AdminVerifyRequest
     await verify_admin(AdminVerifyRequest(password=schedule_data.admin_password), db)
 
-    # Check if a schedule already exists for this category_type and day_of_week
+    # Check if a schedule already exists for this category name and day_of_week
     existing_query = select(CategorySchedule).where(
         and_(
-            CategorySchedule.category_type == schedule_data.category_type,
+            CategorySchedule.name == schedule_data.name,
             CategorySchedule.day_of_week == schedule_data.day_of_week
         )
     )
@@ -60,6 +61,8 @@ async def create_or_update_schedule(
         existing_schedule.rotation_type = schedule_data.rotation_type
         existing_schedule.rotation_weeks = schedule_data.rotation_weeks
         existing_schedule.start_date = schedule_data.start_date
+        existing_schedule.deadline_time = schedule_data.deadline_time
+        existing_schedule.warning_message = schedule_data.warning_message
         
         await db.commit()
         await db.refresh(existing_schedule)
@@ -77,6 +80,8 @@ async def create_or_update_schedule(
             rotation_type=schedule_data.rotation_type,
             rotation_weeks=schedule_data.rotation_weeks,
             start_date=schedule_data.start_date,
+            deadline_time=schedule_data.deadline_time,
+            warning_message=schedule_data.warning_message,
         )
         
         db.add(new_schedule)

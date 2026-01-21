@@ -34,7 +34,9 @@ async def get_slots(
         TimeSlotResponse(
             slot_datetime=slot.slot_datetime,
             category_name=slot.category_name,
-            category_id=slot.category_id
+            category_id=slot.category_id,
+            warning_message=slot.warning_message,
+            deadline_time=slot.deadline_time
         ) for slot in slots
     ]
 
@@ -166,11 +168,13 @@ async def get_all_appointments(
     conditions = []
     
     if start_date:
-        conditions.append(Appointment.appointment_date >= start_date)
+        # Convert date to datetime for proper comparison
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        conditions.append(Appointment.appointment_date >= start_datetime)
     
     if end_date:
-        # Include the whole end date
-        next_day = end_date + timedelta(days=1)
+        # Include the whole end date by going to midnight of the next day
+        next_day = datetime.combine(end_date + timedelta(days=1), datetime.min.time())
         conditions.append(Appointment.appointment_date < next_day)
         
     if specialty:

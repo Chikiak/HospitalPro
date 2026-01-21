@@ -1,5 +1,6 @@
 import enum
 from datetime import time, date as dt_date
+from typing import Optional
 
 from sqlalchemy import Enum, Integer, String, Time, Date
 from sqlalchemy.orm import Mapped, mapped_column
@@ -33,3 +34,7 @@ class CategorySchedule(Base):
     rotation_type: Mapped[RotationType] = mapped_column(Enum(RotationType), nullable=False)
     rotation_weeks: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     start_date: Mapped[dt_date] = mapped_column(Date, nullable=True) # Anchor date for rotation logic
+    # Optional deadline time for sample collection (e.g., for laboratories)
+    deadline_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    # Optional warning message to show to patients (e.g., "Samples not received after 9 AM")
+    warning_message: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
