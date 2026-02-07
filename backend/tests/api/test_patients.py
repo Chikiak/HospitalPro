@@ -46,10 +46,11 @@ async def test_list_all_patients_with_data(client: AsyncClient, test_db: AsyncSe
         },
     )
     
-    # Create a patient user first
+    # Add patient DNI to allowed persons list
     allowed_repo = AllowedPersonRepository(test_db)
     await allowed_repo.bulk_create([{"dni": "98765432101"}])
     
+    # Create a patient user
     patient_response = await client.post(
         "/auth/users/register",
         json={

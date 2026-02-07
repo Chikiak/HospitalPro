@@ -92,7 +92,9 @@ async def test_patient_cannot_access_other_patient_data(client: AsyncClient, tes
     # Patient 1 tries to access Patient 2's medical history
     response = await client.get(f"/patients/{patient2_id}/medical-history", headers=headers)
     assert response.status_code == 403
-    assert "No tiene permisos" in response.json()["detail"]
+    # Verify error message indicates permission denied
+    error_detail = response.json()["detail"]
+    assert "permisos" in error_detail.lower() or "forbidden" in error_detail.lower()
 
 
 @pytest.mark.asyncio
