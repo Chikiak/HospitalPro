@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import RegisterStep2 from './pages/RegisterStep2'
 import Dashboard from './pages/Dashboard'
+import Profile from './pages/Profile'
 import NewAppointment from './pages/appointments/NewAppointment'
 import AdminSettings from './pages/AdminSettings'
 import MainLayout from './layouts/MainLayout'
@@ -108,15 +109,15 @@ function App() {
             }
           />
 
-          {/* Private route - Any authenticated user can access profile */}
+          {/* Private route - Patient profile */}
           <Route
             path="/profile"
             element={
-              <AuthGuard>
+              <RoleGuard allowedRoles={['patient']}>
                 <MainLayout>
-                  <Dashboard />
+                  <Profile />
                 </MainLayout>
-              </AuthGuard>
+              </RoleGuard>
             }
           />
 
