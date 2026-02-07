@@ -18,6 +18,8 @@ from app.models.user import User  # Import required to register User model with 
 from app.models.patient import TriageData  # Import TriageData model
 from app.models.appointment import Appointment  # Import Appointment model
 from app.models.schedule import DoctorAvailability  # Import DoctorAvailability model
+from app.models.allowed_person import AllowedPerson  # Import AllowedPerson model
+from app.models.medical_record import MedicalRecord  # Import MedicalRecord model
 from app.core.config import settings
 
 # this is the Alembic Config object, which provides

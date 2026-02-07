@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -10,7 +11,14 @@ from app.models.patient import TriageData
 from app.models.user import User, UserRole
 from app.repositories.triage_repository import TriageRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.medical_record_repository import MedicalRecordRepository
+from app.repositories.allowed_person_repository import AllowedPersonRepository
 from app.schemas.patient import PatientExportData, TriageDataResponse, TriageDataUpdate
+from app.schemas.medical_record import (
+    MedicalRecordResponse,
+    MedicalRecordEntryCreate,
+    AllowedPersonBulkCreate,
+)
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -58,6 +66,15 @@ async def update_medical_history(
             patient_id=patient_id,
             medical_history=data.medical_history,
             allergies=data.allergies,
+        )
+    
+    # Auto-create medical record if it doesn't exist
+    medical_record_repo = MedicalRecordRepository(db)
+    medical_record = await medical_record_repo.get_by_patient_id(patient_id)
+    if not medical_record and data.medical_history:
+        await medical_record_repo.create(
+            patient_id=patient_id,
+            registration_survey=data.medical_history
         )
     
     return TriageDataResponse.model_validate(triage_data)
@@ -138,3 +155,129 @@ async def list_all_patients(
         )
         for user, triage in rows
     ]
+
+
+@router.get("/{patient_id}/medical-record", response_model=MedicalRecordResponse)
+async def get_medical_record(
+    patient_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> MedicalRecordResponse:
+    """
+    Get patient's complete medical record.
+    
+    Returns the medical record including registration survey and all entries.
+    
+    SECURITY TODO: Add authentication middleware.
+    """
+    # Verify patient exists
+    user_repo = UserRepository(db)
+    patient = await user_repo.get_by_id(patient_id)
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Paciente no encontrado",
+        )
+    
+    # Get medical record
+    medical_record_repo = MedicalRecordRepository(db)
+    medical_record = await medical_record_repo.get_by_patient_id(patient_id)
+    
+    if not medical_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró historia clínica para este paciente",
+        )
+    
+    return MedicalRecordResponse.model_validate(medical_record)
+
+
+@router.post("/{patient_id}/medical-record/entries", response_model=MedicalRecordResponse)
+async def add_medical_record_entry(
+    patient_id: int,
+    entry: MedicalRecordEntryCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> MedicalRecordResponse:
+    """
+    Add a new entry to patient's medical record.
+    
+    Entries can be consultations or laboratory results.
+    
+    SECURITY TODO: Add authentication middleware to verify doctor/staff role.
+    """
+    # Verify patient exists
+    user_repo = UserRepository(db)
+    patient = await user_repo.get_by_id(patient_id)
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Paciente no encontrado",
+        )
+    
+    # Add entry to medical record
+    medical_record_repo = MedicalRecordRepository(db)
+    try:
+        medical_record = await medical_record_repo.add_entry(
+            patient_id=patient_id,
+            entry=entry.model_dump()
+        )
+        return MedicalRecordResponse.model_validate(medical_record)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+@router.get("/{patient_id}/medical-record/pdf")
+async def get_medical_record_pdf(
+    patient_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Generate and download medical record as PDF.
+    
+    SECURITY TODO: Add authentication middleware.
+    """
+    from app.services.pdf_service import generate_medical_record_pdf
+    
+    # Verify patient exists
+    user_repo = UserRepository(db)
+    patient = await user_repo.get_by_id(patient_id)
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Paciente no encontrado",
+        )
+    
+    # Generate PDF
+    pdf_bytes = await generate_medical_record_pdf(patient_id, db)
+    
+    # Return as downloadable file
+    return StreamingResponse(
+        pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=historia_clinica_{patient_id}.pdf"
+        }
+    )
+
+
+@router.post("/allowed-persons/bulk", status_code=status.HTTP_201_CREATED)
+async def bulk_create_allowed_persons(
+    data: AllowedPersonBulkCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Bulk create allowed persons (admin only).
+    
+    SECURITY TODO: Add authentication middleware to verify admin/staff role.
+    """
+    allowed_person_repo = AllowedPersonRepository(db)
+    
+    persons_data = [{"dni": p.dni, "full_name": p.full_name} for p in data.persons]
+    created = await allowed_person_repo.bulk_create(persons_data)
+    
+    return {
+        "message": f"Successfully created {len(created)} allowed persons",
+        "count": len(created)
+    }
