@@ -4,9 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
-
 from app.core.database import get_db
+from app.core.deps import get_current_user, require_role
 from app.models.patient import TriageData
 from app.models.user import User, UserRole
 from app.repositories.triage_repository import TriageRepository
@@ -28,6 +27,7 @@ async def update_medical_history(
     patient_id: int,
     data: TriageDataUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> TriageDataResponse:
     """
     Update or create patient medical history.
@@ -35,11 +35,15 @@ async def update_medical_history(
     This endpoint updates the medical_history field in the triage_data table.
     If no triage data exists for the patient, it creates a new record.
     
-    SECURITY TODO: Add authentication middleware to verify:
-    - The authenticated user's ID matches patient_id, OR
-    - The authenticated user has appropriate role (doctor, admin, staff)
-    This prevents unauthorized access to patient medical records.
+    Requires authentication. Patients can only update their own medical history.
+    Medical professionals (doctor, admin, staff) can update any patient's history.
     """
+    # Check authorization: patients can only access their own data
+    if current_user.role == UserRole.PATIENT and current_user.id != patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para acceder a los datos de otro paciente",
+        )
     # Verify patient exists
     user_repo = UserRepository(db)
     patient = await user_repo.get_by_id(patient_id)
@@ -84,17 +88,22 @@ async def update_medical_history(
 async def get_medical_history(
     patient_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> TriageDataResponse:
     """
     Get patient medical history.
     
     Returns the patient's triage data including medical history and allergies.
     
-    SECURITY TODO: Add authentication middleware to verify:
-    - The authenticated user's ID matches patient_id, OR
-    - The authenticated user has appropriate role (doctor, admin, staff)
-    This prevents unauthorized access to patient medical records.
+    Requires authentication. Patients can only view their own medical history.
+    Medical professionals (doctor, admin, staff) can view any patient's history.
     """
+    # Check authorization: patients can only access their own data
+    if current_user.role == UserRole.PATIENT and current_user.id != patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para acceder a los datos de otro paciente",
+        )
     # Verify patient exists
     user_repo = UserRepository(db)
     patient = await user_repo.get_by_id(patient_id)
@@ -120,6 +129,7 @@ async def get_medical_history(
 @router.get("/", response_model=list[PatientExportData])
 async def list_all_patients(
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_role(["doctor", "admin", "staff"]))],
 ) -> list[PatientExportData]:
     """
     List all patients with their medical data for export.
@@ -128,9 +138,8 @@ async def list_all_patients(
     This endpoint is intended for staff to export patient data to Excel.
     Uses a single database query with a left join for optimal performance.
     
-    SECURITY TODO: Add authentication middleware to verify:
-    - The authenticated user has role staff, admin, or doctor
-    This prevents unauthorized access to all patient records.
+    Requires authentication and role: doctor, admin, or staff.
+    Patients are not allowed to access this endpoint.
     """
     # Use a single query with left join to get patients and their triage data
     query = (
@@ -161,14 +170,22 @@ async def list_all_patients(
 async def get_medical_record(
     patient_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> MedicalRecordResponse:
     """
     Get patient's complete medical record.
     
     Returns the medical record including registration survey and all entries.
     
-    SECURITY TODO: Add authentication middleware.
+    Requires authentication. Patients can only view their own medical record.
+    Medical professionals (doctor, admin, staff) can view any patient's record.
     """
+    # Check authorization: patients can only access their own data
+    if current_user.role == UserRole.PATIENT and current_user.id != patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para acceder a los datos de otro paciente",
+        )
     # Verify patient exists
     user_repo = UserRepository(db)
     patient = await user_repo.get_by_id(patient_id)
@@ -196,13 +213,15 @@ async def add_medical_record_entry(
     patient_id: int,
     entry: MedicalRecordEntryCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_role(["doctor", "admin", "staff"]))],
 ) -> MedicalRecordResponse:
     """
     Add a new entry to patient's medical record.
     
     Entries can be consultations or laboratory results.
     
-    SECURITY TODO: Add authentication middleware to verify doctor/staff role.
+    Requires authentication and role: doctor, admin, or staff.
+    Only medical professionals can add entries to medical records.
     """
     # Verify patient exists
     user_repo = UserRepository(db)
@@ -232,12 +251,20 @@ async def add_medical_record_entry(
 async def get_medical_record_pdf(
     patient_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Generate and download medical record as PDF.
     
-    SECURITY TODO: Add authentication middleware.
+    Requires authentication. Patients can only download their own medical record.
+    Medical professionals (doctor, admin, staff) can download any patient's record.
     """
+    # Check authorization: patients can only access their own data
+    if current_user.role == UserRole.PATIENT and current_user.id != patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para acceder a los datos de otro paciente",
+        )
     from app.services.pdf_service import generate_medical_record_pdf
     
     # Verify patient exists
@@ -266,11 +293,13 @@ async def get_medical_record_pdf(
 async def bulk_create_allowed_persons(
     data: AllowedPersonBulkCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_role(["admin", "staff"]))],
 ):
     """
-    Bulk create allowed persons (admin only).
+    Bulk create allowed persons (admin/staff only).
     
-    SECURITY TODO: Add authentication middleware to verify admin/staff role.
+    Requires authentication and role: admin or staff.
+    Only administrators can manage the allowed persons whitelist.
     """
     allowed_person_repo = AllowedPersonRepository(db)
     
