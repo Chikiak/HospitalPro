@@ -1,11 +1,30 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.security import create_access_token
+from app.repositories.allowed_person_repository import AllowedPersonRepository
 
 
 @pytest.mark.asyncio
-async def test_list_all_patients_empty(client: AsyncClient):
+async def test_list_all_patients_empty(client: AsyncClient, test_db: AsyncSession):
     """Test listing patients when database is empty."""
-    response = await client.get("/patients/")
+    # Create staff user for authentication
+    await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "99999999999",
+            "password": "staffpass123",
+            "full_name": "Staff User",
+            "role": "staff",
+        },
+    )
+    
+    # Create token for staff
+    token = create_access_token({"sub": "99999999999", "role": "staff"})
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    response = await client.get("/patients/", headers=headers)
     
     assert response.status_code == 200
     data = response.json()
@@ -14,9 +33,24 @@ async def test_list_all_patients_empty(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_all_patients_with_data(client: AsyncClient):
+async def test_list_all_patients_with_data(client: AsyncClient, test_db: AsyncSession):
     """Test listing patients with patient data."""
-    # Create a patient user first
+    # Create staff user for authentication
+    await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "99999999999",
+            "password": "staffpass123",
+            "full_name": "Staff User",
+            "role": "staff",
+        },
+    )
+    
+    # Add patient DNI to allowed persons list
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "98765432101"}])
+    
+    # Create a patient user
     patient_response = await client.post(
         "/auth/users/register",
         json={
@@ -30,6 +64,10 @@ async def test_list_all_patients_with_data(client: AsyncClient):
     patient = patient_response.json()
     patient_id = patient["id"]
     
+    # Create token for staff to add medical history
+    staff_token = create_access_token({"sub": "99999999999", "role": "staff"})
+    staff_headers = {"Authorization": f"Bearer {staff_token}"}
+    
     # Add medical history for the patient
     await client.patch(
         f"/patients/{patient_id}/medical-history",
@@ -40,10 +78,11 @@ async def test_list_all_patients_with_data(client: AsyncClient):
             },
             "allergies": "Penicillin"
         },
+        headers=staff_headers,
     )
     
     # List all patients
-    response = await client.get("/patients/")
+    response = await client.get("/patients/", headers=staff_headers)
     
     assert response.status_code == 200
     data = response.json()
@@ -59,9 +98,23 @@ async def test_list_all_patients_with_data(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_patients_excludes_non_patients(client: AsyncClient):
+async def test_list_patients_excludes_non_patients(client: AsyncClient, test_db: AsyncSession):
     """Test that listing patients only returns users with patient role."""
+    # Create staff user for authentication
+    await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "99999999999",
+            "password": "staffpass123",
+            "full_name": "Staff User",
+            "role": "staff",
+        },
+    )
+    
     # Create a patient
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "11111111111"}])
+    
     await client.post(
         "/auth/users/register",
         json={
@@ -83,8 +136,12 @@ async def test_list_patients_excludes_non_patients(client: AsyncClient):
         },
     )
     
+    # Create token for staff
+    token = create_access_token({"sub": "99999999999", "role": "staff"})
+    headers = {"Authorization": f"Bearer {token}"}
+    
     # List all patients
-    response = await client.get("/patients/")
+    response = await client.get("/patients/", headers=headers)
     
     assert response.status_code == 200
     data = response.json()
@@ -96,9 +153,23 @@ async def test_list_patients_excludes_non_patients(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_patients_without_medical_history(client: AsyncClient):
+async def test_list_patients_without_medical_history(client: AsyncClient, test_db: AsyncSession):
     """Test listing patients who haven't filled medical history yet."""
+    # Create staff user for authentication
+    await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "99999999999",
+            "password": "staffpass123",
+            "full_name": "Staff User",
+            "role": "staff",
+        },
+    )
+    
     # Create a patient without medical history
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "33333333333"}])
+    
     patient_response = await client.post(
         "/auth/users/register",
         json={
@@ -110,8 +181,12 @@ async def test_list_patients_without_medical_history(client: AsyncClient):
     )
     assert patient_response.status_code == 201
     
+    # Create token for staff
+    token = create_access_token({"sub": "99999999999", "role": "staff"})
+    headers = {"Authorization": f"Bearer {token}"}
+    
     # List all patients
-    response = await client.get("/patients/")
+    response = await client.get("/patients/", headers=headers)
     
     assert response.status_code == 200
     data = response.json()
