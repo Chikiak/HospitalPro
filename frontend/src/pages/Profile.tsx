@@ -146,8 +146,7 @@ export default function Profile() {
                     Datos de Registro
                   </h3>
                   <div className="space-y-4 bg-slate-50/50 rounded-xl p-6">
-                    {/* Chronic Diseases */}
-                    {medicalRecord.registration_survey.chronic_diseases && (
+                    {typeof medicalRecord.registration_survey.chronic_diseases === 'string' && medicalRecord.registration_survey.chronic_diseases && (
                       <div className="space-y-2">
                         <span className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                           <HeartPulse className="h-4 w-4" />
@@ -159,8 +158,7 @@ export default function Profile() {
                       </div>
                     )}
 
-                    {/* Medication Allergies */}
-                    {medicalRecord.registration_survey.medication_allergies && (
+                    {(typeof medicalRecord.registration_survey.medication_allergies === 'string' || Array.isArray(medicalRecord.registration_survey.medication_allergies)) && medicalRecord.registration_survey.medication_allergies && (
                       <div className="space-y-2">
                         <span className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                           <Pill className="h-4 w-4" />
@@ -191,8 +189,7 @@ export default function Profile() {
                       </div>
                     )}
 
-                    {/* Other Information */}
-                    {medicalRecord.registration_survey.other_information && (
+                    {typeof medicalRecord.registration_survey.other_information === 'string' && medicalRecord.registration_survey.other_information && (
                       <div className="space-y-2">
                         <span className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                           <ClipboardList className="h-4 w-4" />
