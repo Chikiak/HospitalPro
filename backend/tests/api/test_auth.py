@@ -1,13 +1,19 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import patch
 
 from app.models.user import UserRole
+from app.repositories.allowed_person_repository import AllowedPersonRepository
 
 
 @pytest.mark.asyncio
-async def test_register_user(client: AsyncClient):
+async def test_register_user(client: AsyncClient, test_db: AsyncSession):
     """Test successful user registration."""
+    # Add DNI to whitelist
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "12345678901"}])
+    
     response = await client.post(
         "/auth/users/register",
         json={
@@ -29,8 +35,12 @@ async def test_register_user(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_register_duplicate_dni(client: AsyncClient):
+async def test_register_duplicate_dni(client: AsyncClient, test_db: AsyncSession):
     """Test registration with duplicate DNI returns 409."""
+    # Add DNI to whitelist
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "12345678901"}])
+    
     # Register first user
     await client.post(
         "/auth/users/register",
@@ -60,8 +70,12 @@ async def test_register_duplicate_dni(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_login_success(client: AsyncClient):
+async def test_login_success(client: AsyncClient, test_db: AsyncSession):
     """Test successful login."""
+    # Add DNI to whitelist
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "12345678901"}])
+    
     # Register a user first
     await client.post(
         "/auth/users/register",
@@ -91,8 +105,12 @@ async def test_login_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_login_wrong_password(client: AsyncClient):
+async def test_login_wrong_password(client: AsyncClient, test_db: AsyncSession):
     """Test login with wrong password returns 401."""
+    # Add DNI to whitelist
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "12345678901"}])
+    
     # Register a user first
     await client.post(
         "/auth/users/register",
