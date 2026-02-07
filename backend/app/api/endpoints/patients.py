@@ -24,7 +24,7 @@ from app.schemas.medical_record import (
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
-# Initialize limiter
+# Get limiter instance (will use the same storage backend as the one in main.py)
 limiter = Limiter(key_func=get_remote_address)
 
 

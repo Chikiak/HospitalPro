@@ -17,7 +17,7 @@ from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
-# Initialize limiter
+# Get limiter instance (will use the same storage backend as the one in main.py)
 limiter = Limiter(key_func=get_remote_address)
 
 
