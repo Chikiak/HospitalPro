@@ -2,6 +2,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import create_access_token
 from app.repositories.allowed_person_repository import AllowedPersonRepository
 from app.repositories.medical_record_repository import MedicalRecordRepository
 from app.repositories.user_repository import UserRepository
@@ -29,6 +30,10 @@ async def test_auto_create_medical_record_on_update_medical_history(
     assert register_response.status_code == 201
     patient_id = register_response.json()["id"]
     
+    # Create auth token for patient
+    token = create_access_token({"sub": "12345678901", "role": "patient"})
+    headers = {"Authorization": f"Bearer {token}"}
+    
     # Update medical history (this should auto-create the medical record)
     response = await client.patch(
         f"/patients/{patient_id}/medical-history",
@@ -38,6 +43,7 @@ async def test_auto_create_medical_record_on_update_medical_history(
                 "allergies": "Penicillin"
             }
         },
+        headers=headers,
     )
     assert response.status_code == 200
     
@@ -74,8 +80,12 @@ async def test_get_medical_record(client: AsyncClient, test_db: AsyncSession):
         registration_survey={"allergies": "None", "chronic_diseases": []}
     )
     
+    # Create auth token for patient
+    token = create_access_token({"sub": "12345678901", "role": "patient"})
+    headers = {"Authorization": f"Bearer {token}"}
+    
     # Get medical record
-    response = await client.get(f"/patients/{patient_id}/medical-record")
+    response = await client.get(f"/patients/{patient_id}/medical-record", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert data["patient_id"] == patient_id
@@ -101,8 +111,12 @@ async def test_get_medical_record_not_found(client: AsyncClient, test_db: AsyncS
     )
     patient_id = register_response.json()["id"]
     
+    # Create auth token for patient
+    token = create_access_token({"sub": "12345678901", "role": "patient"})
+    headers = {"Authorization": f"Bearer {token}"}
+    
     # Try to get medical record
-    response = await client.get(f"/patients/{patient_id}/medical-record")
+    response = await client.get(f"/patients/{patient_id}/medical-record", headers=headers)
     assert response.status_code == 404
 
 
@@ -128,6 +142,21 @@ async def test_add_medical_record_entry_consultation(client: AsyncClient, test_d
     medical_record_repo = MedicalRecordRepository(test_db)
     await medical_record_repo.create(patient_id=patient_id)
     
+    # Create auth token for staff to add entry
+    staff_allowed_repo = AllowedPersonRepository(test_db)
+    await staff_allowed_repo.bulk_create([{"dni": "98765432100", "full_name": "Staff User"}])
+    staff_register_response = await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "98765432100",
+            "password": "staffpassword123",
+            "full_name": "Staff User",
+            "role": "staff",
+        },
+    )
+    staff_token = create_access_token({"sub": "98765432100", "role": "staff"})
+    staff_headers = {"Authorization": f"Bearer {staff_token}"}
+    
     # Add consultation entry
     response = await client.post(
         f"/patients/{patient_id}/medical-record/entries",
@@ -138,6 +167,7 @@ async def test_add_medical_record_entry_consultation(client: AsyncClient, test_d
             "diagnosis": "Hypertension",
             "notes": "Patient advised to reduce salt intake"
         },
+        headers=staff_headers,
     )
     
     assert response.status_code == 200
@@ -170,6 +200,21 @@ async def test_add_medical_record_entry_lab_result(client: AsyncClient, test_db:
     medical_record_repo = MedicalRecordRepository(test_db)
     await medical_record_repo.create(patient_id=patient_id)
     
+    # Create auth token for staff to add entry
+    staff_allowed_repo = AllowedPersonRepository(test_db)
+    await staff_allowed_repo.bulk_create([{"dni": "98765432100", "full_name": "Staff User"}])
+    staff_register_response = await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "98765432100",
+            "password": "staffpassword123",
+            "full_name": "Staff User",
+            "role": "staff",
+        },
+    )
+    staff_token = create_access_token({"sub": "98765432100", "role": "staff"})
+    staff_headers = {"Authorization": f"Bearer {staff_token}"}
+    
     # Add lab result entry
     response = await client.post(
         f"/patients/{patient_id}/medical-record/entries",
@@ -182,6 +227,7 @@ async def test_add_medical_record_entry_lab_result(client: AsyncClient, test_db:
             },
             "notes": "Results within normal range"
         },
+        headers=staff_headers,
     )
     
     assert response.status_code == 200
@@ -213,6 +259,21 @@ async def test_add_multiple_entries(client: AsyncClient, test_db: AsyncSession):
     medical_record_repo = MedicalRecordRepository(test_db)
     await medical_record_repo.create(patient_id=patient_id)
     
+    # Create auth token for staff to add entries
+    staff_allowed_repo = AllowedPersonRepository(test_db)
+    await staff_allowed_repo.bulk_create([{"dni": "98765432100", "full_name": "Staff User"}])
+    staff_register_response = await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "98765432100",
+            "password": "staffpassword123",
+            "full_name": "Staff User",
+            "role": "staff",
+        },
+    )
+    staff_token = create_access_token({"sub": "98765432100", "role": "staff"})
+    staff_headers = {"Authorization": f"Bearer {staff_token}"}
+    
     # Add first entry
     await client.post(
         f"/patients/{patient_id}/medical-record/entries",
@@ -221,6 +282,7 @@ async def test_add_multiple_entries(client: AsyncClient, test_db: AsyncSession):
             "specialty": "General Medicine",
             "diagnosis": "Common cold"
         },
+        headers=staff_headers,
     )
     
     # Add second entry
@@ -230,10 +292,15 @@ async def test_add_multiple_entries(client: AsyncClient, test_db: AsyncSession):
             "entry_type": "lab_result",
             "results": {"test": "negative"}
         },
+        headers=staff_headers,
     )
     
+    # Create auth token for patient to get their record
+    patient_token = create_access_token({"sub": "12345678901", "role": "patient"})
+    patient_headers = {"Authorization": f"Bearer {patient_token}"}
+    
     # Get medical record and verify both entries
-    response = await client.get(f"/patients/{patient_id}/medical-record")
+    response = await client.get(f"/patients/{patient_id}/medical-record", headers=patient_headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data["entries"]) == 2
@@ -257,6 +324,21 @@ async def test_add_entry_to_nonexistent_medical_record(client: AsyncClient, test
     )
     patient_id = register_response.json()["id"]
     
+    # Create auth token for staff
+    staff_allowed_repo = AllowedPersonRepository(test_db)
+    await staff_allowed_repo.bulk_create([{"dni": "98765432100", "full_name": "Staff User"}])
+    staff_register_response = await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "98765432100",
+            "password": "staffpassword123",
+            "full_name": "Staff User",
+            "role": "staff",
+        },
+    )
+    staff_token = create_access_token({"sub": "98765432100", "role": "staff"})
+    staff_headers = {"Authorization": f"Bearer {staff_token}"}
+    
     # Try to add entry without creating medical record first
     response = await client.post(
         f"/patients/{patient_id}/medical-record/entries",
@@ -264,6 +346,7 @@ async def test_add_entry_to_nonexistent_medical_record(client: AsyncClient, test
             "entry_type": "consultation",
             "diagnosis": "Test"
         },
+        headers=staff_headers,
     )
     
     assert response.status_code == 404
@@ -304,8 +387,12 @@ async def test_generate_medical_record_pdf(client: AsyncClient, test_db: AsyncSe
         }
     )
     
+    # Create auth token for patient
+    token = create_access_token({"sub": "12345678901", "role": "patient"})
+    headers = {"Authorization": f"Bearer {token}"}
+    
     # Generate PDF
-    response = await client.get(f"/patients/{patient_id}/medical-record/pdf")
+    response = await client.get(f"/patients/{patient_id}/medical-record/pdf", headers=headers)
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert "content-disposition" in response.headers
