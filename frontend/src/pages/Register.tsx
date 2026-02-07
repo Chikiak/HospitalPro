@@ -23,8 +23,10 @@ export default function Register() {
                 navigate('/')
             }
         } catch (err) {
-            const error = err as { response?: { data?: { detail?: string } } }
-            if (error.response?.data?.detail) {
+            const error = err as { response?: { status?: number; data?: { detail?: string } } }
+            if (error.response?.status === 403) {
+                setError('Su DNI no está autorizado para registrarse en el sistema. Contacte al administrador.')
+            } else if (error.response?.data?.detail) {
                 setError(error.response.data.detail)
             } else {
                 setError('Error al registrarse. Por favor, intente nuevamente.')
