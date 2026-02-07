@@ -1,11 +1,21 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MedicalRecordEntryCreate(BaseModel):
     """Schema for creating a new medical record entry."""
+    
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "entry_type": "consultation",
+            "specialty": "Cardiology",
+            "doctor_name": "Dr. Juan Pérez",
+            "diagnosis": "Hypertension",
+            "notes": "Patient advised to reduce salt intake"
+        }
+    })
     
     entry_type: str = Field(..., description="Type of entry: 'consultation' or 'lab_result'")
     specialty: Optional[str] = Field(None, description="Medical specialty")
@@ -13,21 +23,12 @@ class MedicalRecordEntryCreate(BaseModel):
     diagnosis: Optional[str] = Field(None, description="Diagnosis or findings")
     notes: Optional[str] = Field(None, description="Additional notes")
     results: Optional[dict[str, Any]] = Field(None, description="Lab results or other data")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "entry_type": "consultation",
-                "specialty": "Cardiology",
-                "doctor_name": "Dr. Juan Pérez",
-                "diagnosis": "Hypertension",
-                "notes": "Patient advised to reduce salt intake"
-            }
-        }
 
 
 class MedicalRecordResponse(BaseModel):
     """Schema for medical record response."""
+    
+    model_config = ConfigDict(from_attributes=True)
     
     id: int
     patient_id: int
@@ -35,9 +36,6 @@ class MedicalRecordResponse(BaseModel):
     entries: list[dict[str, Any]] = []
     created_at: datetime
     last_updated: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class AllowedPersonCreate(BaseModel):

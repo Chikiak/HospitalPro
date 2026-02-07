@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, func
@@ -31,11 +31,11 @@ class MedicalRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        server_default=func.timezone('UTC', func.now())
+        default=lambda: datetime.now(timezone.utc)
     )
     last_updated: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        server_default=func.timezone('UTC', func.now()),
-        onupdate=func.timezone('UTC', func.now())
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
     )

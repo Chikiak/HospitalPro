@@ -59,7 +59,7 @@ async def test_register_non_patient_without_whitelist(client: AsyncClient, test_
     response = await client.post(
         "/auth/users/register",
         json={
-            "dni": "doctordni001",
+            "dni": "99999999999",
             "password": "doctorpass123",
             "full_name": "Dr. Juan Perez",
             "role": "doctor",

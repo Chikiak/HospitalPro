@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import select
@@ -75,7 +75,7 @@ class MedicalRecordRepository:
         # Add timestamp to entry
         entry_with_timestamp = {
             **entry,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
         # Append to entries array
