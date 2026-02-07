@@ -9,6 +9,7 @@ oracledb
 pandas
 openpyxl
 weasyprint
+fpdf2
 python-multipart
 pytest
 pytest-mock

@@ -158,6 +158,12 @@ async def register(
             role=user_data.role,
         )
         return UserResponse.model_validate(user)
+    except ValueError as e:
+        # Handle DNI not authorized error
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
     except IntegrityError:
         await db.rollback()
         raise HTTPException(
