@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.endpoints import admin
 from app.api.endpoints import auth
@@ -18,6 +21,41 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SGT-H API", version="0.1.0", lifespan=lifespan)
+
+# Security Middlewares
+# Note: Middleware is applied in reverse order (last added = outermost layer)
+# We want: HTTPS Redirect -> Trusted Host -> CORS
+
+# Get environment configuration
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+# HTTPS Redirect Middleware - Forces all HTTP traffic to HTTPS (301 redirect)
+# Only enabled in production (when ENVIRONMENT is set to 'production')
+if ENVIRONMENT == "production":
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+# Trusted Host Middleware - Prevents HTTP Host Header attacks
+# Configure allowed hosts based on environment
+if ENVIRONMENT == "production":
+    # In production, ALLOWED_HOSTS must be explicitly set
+    allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
+    if not allowed_hosts_env:
+        raise ValueError(
+            "ALLOWED_HOSTS environment variable must be set in production mode. "
+            "Example: ALLOWED_HOSTS=api.hospital.com,hospital.com"
+        )
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]
+else:
+    # In development, use localhost by default but allow override
+    allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1")
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]
+    # Add wildcard support for development for easier testing
+    ALLOWED_HOSTS.append("*")
+
+app.add_middleware(
+    TrustedHostMiddleware, 
+    allowed_hosts=ALLOWED_HOSTS
+)
 
 # Configure CORS
 origins = [
