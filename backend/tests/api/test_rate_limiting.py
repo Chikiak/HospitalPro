@@ -36,7 +36,7 @@ async def test_login_rate_limit_is_enforced(client: AsyncClient, test_db: AsyncS
     rate_limited = False
     max_attempts = 10
     
-    for i in range(max_attempts):
+    for _ in range(max_attempts):
         response = await client.post(
             "/auth/login/access-token",
             json={"dni": "99999999999", "password": "wrongpassword"},
@@ -58,7 +58,7 @@ async def test_staff_login_rate_limit_is_enforced(client: AsyncClient, test_db: 
     rate_limited = False
     max_attempts = 10
     
-    for i in range(max_attempts):
+    for _ in range(max_attempts):
         response = await client.post(
             "/auth/login/staff",
             json={"password": "wrongpassword"},
@@ -107,7 +107,7 @@ async def test_pdf_export_rate_limit_is_configured(client: AsyncClient, test_db:
         rate_limited = False
         max_attempts = 15
         
-        for i in range(max_attempts):
+        for _ in range(max_attempts):
             response = await client.get(
                 f"/patients/{patient_id}/medical-record/pdf",
                 headers=headers,
@@ -157,5 +157,3 @@ async def test_rate_limiting_allows_normal_use(client: AsyncClient, test_db: Asy
         # Should be able to login successfully
         assert response.status_code == 200
         assert "access_token" in response.json()
-
-
