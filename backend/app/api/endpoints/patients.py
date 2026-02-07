@@ -1,9 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
 from app.models.patient import TriageData
@@ -20,6 +23,9 @@ from app.schemas.medical_record import (
 )
 
 router = APIRouter(prefix="/patients", tags=["patients"])
+
+# Initialize limiter
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.patch("/{patient_id}/medical-history", response_model=TriageDataResponse)
@@ -248,13 +254,18 @@ async def add_medical_record_entry(
 
 
 @router.get("/{patient_id}/medical-record/pdf")
+@limiter.limit("10/minute")
 async def get_medical_record_pdf(
+    request: Request,
     patient_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Generate and download medical record as PDF.
+    
+    Rate limited to 10 requests per minute per IP to prevent resource exhaustion
+    from PDF generation operations.
     
     Requires authentication. Patients can only download their own medical record.
     Medical professionals (doctor, admin, staff) can download any patient's record.
