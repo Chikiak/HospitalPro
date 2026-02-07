@@ -153,12 +153,12 @@ export default function Profile() {
                           Enfermedades Crónicas:
                         </span>
                         <p className="text-slate-700 ml-6">
-                          {String(medicalRecord.registration_survey.chronic_diseases) || 'No registrado'}
+                          {String(medicalRecord.registration_survey.chronic_diseases)}
                         </p>
                       </div>
                     )}
 
-                    {(typeof medicalRecord.registration_survey.medication_allergies === 'string' || Array.isArray(medicalRecord.registration_survey.medication_allergies)) && medicalRecord.registration_survey.medication_allergies && (
+                    {(typeof medicalRecord.registration_survey.medication_allergies === 'string' || Array.isArray(medicalRecord.registration_survey.medication_allergies)) && medicalRecord.registration_survey.medication_allergies && (Array.isArray(medicalRecord.registration_survey.medication_allergies) ? medicalRecord.registration_survey.medication_allergies.length > 0 : true) && (
                       <div className="space-y-2">
                         <span className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                           <Pill className="h-4 w-4" />
@@ -166,20 +166,16 @@ export default function Profile() {
                         </span>
                         <div className="ml-6">
                           {Array.isArray(medicalRecord.registration_survey.medication_allergies) ? (
-                            medicalRecord.registration_survey.medication_allergies.length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {medicalRecord.registration_survey.medication_allergies.map((allergy, index) => (
-                                  <span
-                                    key={index}
-                                    className="px-3 py-1 bg-teal-100 text-teal-700 text-sm rounded-lg font-medium"
-                                  >
-                                    {String(allergy)}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-slate-700">No registrado</p>
-                            )
+                            <div className="flex flex-wrap gap-2">
+                              {medicalRecord.registration_survey.medication_allergies.map((allergy, index) => (
+                                <span
+                                  key={index}
+                                  className="px-3 py-1 bg-teal-100 text-teal-700 text-sm rounded-lg font-medium"
+                                >
+                                  {String(allergy)}
+                                </span>
+                              ))}
+                            </div>
                           ) : (
                             <p className="text-slate-700">
                               {String(medicalRecord.registration_survey.medication_allergies)}
@@ -196,7 +192,7 @@ export default function Profile() {
                           Otros Datos de Interés:
                         </span>
                         <p className="text-slate-700 ml-6">
-                          {String(medicalRecord.registration_survey.other_information) || 'No registrado'}
+                          {String(medicalRecord.registration_survey.other_information)}
                         </p>
                       </div>
                     )}
