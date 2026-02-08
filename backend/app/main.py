@@ -1,16 +1,19 @@
 from contextlib import asynccontextmanager
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api.endpoints import admin
 from app.api.endpoints import auth
 from app.api.endpoints import appointments
 from app.api.endpoints import patients
 from app.core.database import init_db
+from app.core.rate_limit import limiter
 
 
 @asynccontextmanager
@@ -21,6 +24,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SGT-H API", version="0.1.0", lifespan=lifespan)
+
+# Configure rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Security Middlewares
 # Note: Middleware is applied in reverse order (last added = outermost layer)

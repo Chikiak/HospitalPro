@@ -1,13 +1,14 @@
 from typing import Annotated
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import create_access_token
+from app.core.rate_limit import limiter
 from app.models.user import UserRole
 from app.schemas.auth import LoginRequest, StaffLoginRequest, Token
 from app.schemas.user import UserCreate, UserResponse
@@ -17,11 +18,16 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
 @router.post("/login/access-token", response_model=Token)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     credentials: LoginRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
-    """Login endpoint - authenticate user and return access token."""
+    """Login endpoint - authenticate user and return access token.
+    
+    Rate limit: 5 requests per minute to prevent brute force attacks.
+    """
     auth_service = AuthService(db)
     
     user = await auth_service.authenticate_user(credentials.dni, credentials.password)
@@ -37,11 +43,16 @@ async def login(
 
 
 @router.post("/login/staff", response_model=Token)
+@limiter.limit("3/minute")
 async def login_staff(
+    request: Request,
     credentials: StaffLoginRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
-    """Staff login endpoint - authenticate staff and return access token with staff role."""
+    """Staff login endpoint - authenticate staff and return access token with staff role.
+    
+    Rate limit: 3 requests per minute to prevent brute force attacks on admin accounts.
+    """
     from sqlalchemy import select
     from app.models.system_config import SystemConfig
     from app.models.user import User
