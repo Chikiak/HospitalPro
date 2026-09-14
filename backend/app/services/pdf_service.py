@@ -19,16 +19,22 @@ class MedicalRecordPDF(FPDF):
         """Initialize PDF with UTF-8 font support."""
         super().__init__()
         
+        # Default fallback
+        self._font_family = "Helvetica"
+        
         # Register DejaVu fonts for UTF-8 support (accents, tildes)
         font_path = FONT_DIR / "DejaVuSans.ttf"
         if font_path.exists():
-            self.add_font("DejaVu", "", str(font_path), uni=True)
-            self.add_font("DejaVu", "B", str(FONT_DIR / "DejaVuSans-Bold.ttf"), uni=True)
-            self.add_font("DejaVu", "I", str(FONT_DIR / "DejaVuSans-Oblique.ttf"), uni=True)
-            self._font_family = "DejaVu"
-        else:
-            # Fallback to Helvetica if DejaVu fonts are not available
-            self._font_family = "Helvetica"
+            try:
+                self.add_font("DejaVu", "", str(font_path), uni=True)
+                self.add_font("DejaVu", "B", str(FONT_DIR / "DejaVuSans-Bold.ttf"), uni=True)
+                self.add_font("DejaVu", "I", str(FONT_DIR / "DejaVuSans-Oblique.ttf"), uni=True)
+                self._font_family = "DejaVu"
+            except Exception as e:
+                # If fonts are corrupted (as seen in the logs), fall back to Helvetica
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to load custom fonts, falling back to Helvetica: {e}")
+                self._font_family = "Helvetica"
     
     def header(self):
         """Add header to each page."""
