@@ -1,7 +1,7 @@
 from datetime import time, date
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationInfo
 
 from app.models.category_schedule import CategoryType, RotationType
 
@@ -11,6 +11,13 @@ class CategoryScheduleCreate(BaseModel):
     admin_password: str = Field(..., min_length=1, description="Admin password for authorization")
     category_type: CategoryType = Field(..., description="Type of category (specialty or laboratory)")
     name: str = Field(..., max_length=100, description="Name of the specialty or laboratory")
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str, info: ValidationInfo) -> str:
+        if info.data.get('category_type') == CategoryType.LABORATORY:
+            return "Laboratorio"
+        return v
     day_of_week: int = Field(..., ge=0, le=6, description="Day of week (0=Monday, 6=Sunday)")
     start_time: time = Field(..., description="Start time of the availability block")
     turn_duration: int = Field(..., gt=0, description="Duration of each turn in minutes")

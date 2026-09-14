@@ -86,13 +86,14 @@ export default function AdminScheduleManager({ adminPasswordProvider }: AdminSch
     }
 
     const handleCreateCategory = async () => {
-        if (!newCategoryName) return
+        const nameToCreate = newCategoryType === 'laboratory' ? 'Laboratorio' : newCategoryName
+        if (!nameToCreate) return
         try {
             const pass = await adminPasswordProvider()
             await api.post('/admin/categories', {
                 admin_password: pass,
                 category_type: newCategoryType,
-                name: newCategoryName
+                name: nameToCreate
             })
             fetchSchedules()
             setNewCategoryName('')
@@ -122,9 +123,11 @@ export default function AdminScheduleManager({ adminPasswordProvider }: AdminSch
                 <div className="flex-1">
                     <label className="text-xs font-bold uppercase text-slate-500">Nombre</label>
                     <Input
-                        value={newCategoryName}
+                        value={newCategoryType === 'laboratory' ? 'Laboratorio' : newCategoryName}
                         onChange={(e) => setNewCategoryName(e.target.value)}
                         placeholder="Ej. Cardiología"
+                        disabled={newCategoryType === 'laboratory'}
+                        className={newCategoryType === 'laboratory' ? 'bg-slate-100 text-slate-500' : ''}
                     />
                 </div>
                 <div className="w-40">
@@ -143,6 +146,13 @@ export default function AdminScheduleManager({ adminPasswordProvider }: AdminSch
                     Crear
                 </Button>
             </div>
+
+            {newCategoryType === 'laboratory' && (
+                <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                    <AlertTriangle size={14} />
+                    <span>Nota: Los laboratorios funcionan principalmente los Lunes y Miércoles, pero puede configurar otros días si es necesario.</span>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {categories.map(cat => (
@@ -188,14 +198,14 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
     const [editedCategory, setEditedCategory] = useState<Category>(JSON.parse(JSON.stringify(category)))
     const [isSaving, setIsSaving] = useState(false)
     const isLaboratory = category.type === 'laboratory'
-    
+
     // Default values based on category type - centralized to avoid duplication
     const DEFAULT_LAB_MAX_TURNS = 10
     const DEFAULT_SPECIALTY_MAX_TURNS = 1
     const DEFAULT_LAB_DEADLINE = '09:00'
-    
+
     const getDefaultMaxTurns = () => isLaboratory ? DEFAULT_LAB_MAX_TURNS : DEFAULT_SPECIALTY_MAX_TURNS
-    const getDefaultWarningMessage = (deadline: string = DEFAULT_LAB_DEADLINE) => 
+    const getDefaultWarningMessage = (deadline: string = DEFAULT_LAB_DEADLINE) =>
         isLaboratory ? `⚠️ IMPORTANTE: No recibimos muestras después de las ${deadline}. Debe presentarse temprano.` : undefined
 
     const updateDay = (dayId: number, changes: Partial<DaySchedule>) => {
@@ -204,7 +214,7 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
             const defaultMaxTurns = getDefaultMaxTurns()
             const defaultDeadline = isLaboratory ? DEFAULT_LAB_DEADLINE : undefined
             const defaultWarning = getDefaultWarningMessage(defaultDeadline)
-            
+
             const current = next.schedules[dayId] || {
                 enabled: false,
                 day_of_week: dayId,
@@ -285,8 +295,9 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
                     <div>
                         <p className="font-bold text-amber-800">Configuración de Laboratorio</p>
                         <p className="text-sm text-amber-700">
-                            Los laboratorios tienen límite de turnos diarios y hora límite de recepción de muestras. 
-                            Configure estos parámetros según las necesidades del servicio.
+                            Todos los turnos de laboratorio son a la misma hora.
+                            Se notificará automáticamente al paciente que debe llegar 30 minutos antes.
+                            Configure la hora límite de recepción de muestras según las necesidades del servicio.
                         </p>
                     </div>
                 </div>
@@ -297,13 +308,13 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
                     const defaultMaxTurns = getDefaultMaxTurns()
                     const defaultDeadline = isLaboratory ? DEFAULT_LAB_DEADLINE : undefined
                     const defaultWarning = getDefaultWarningMessage(defaultDeadline)
-                    const schedule = editedCategory.schedules[day.id] || { 
-                        enabled: false, 
-                        start_time: '08:00', 
-                        duration: 30, 
+                    const schedule = editedCategory.schedules[day.id] || {
+                        enabled: false,
+                        start_time: '08:00',
+                        duration: 30,
                         max_turns: defaultMaxTurns,
-                        rotation_type: 'fixed', 
-                        rotation_weeks: 1, 
+                        rotation_type: 'fixed',
+                        rotation_weeks: 1,
                         start_date: new Date().toISOString().split('T')[0],
                         deadline_time: defaultDeadline,
                         warning_message: defaultWarning
@@ -391,7 +402,7 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
                                                 </>
                                             )}
                                         </div>
-                                        
+
                                         {/* Laboratory specific fields */}
                                         {isLaboratory && (
                                             <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
@@ -405,15 +416,8 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
                                                             className="h-9 text-xs border-amber-200"
                                                         />
                                                     </div>
-                                                    <div className="sm:col-span-1">
-                                                        <label className="text-[10px] uppercase font-bold text-amber-700">Mensaje de Aviso</label>
-                                                        <Input
-                                                            type="text"
-                                                            value={schedule.warning_message || ''}
-                                                            placeholder="Ej: Debe presentarse a las 7:30 AM"
-                                                            onChange={(e) => updateDay(day.id, { warning_message: e.target.value })}
-                                                            className="h-9 text-xs border-amber-200"
-                                                        />
+                                                    <div className="flex items-center text-xs text-amber-700">
+                                                        <span>⚠️ Nota: Se indicará al paciente que debe llegar 30 min antes del turno.</span>
                                                     </div>
                                                 </div>
                                             </div>

@@ -4,7 +4,7 @@ from typing import List, Union, Optional
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.category_schedule import CategorySchedule, RotationType
+from app.models.category_schedule import CategorySchedule, RotationType, CategoryType
 from app.models.appointment import Appointment, AppointmentStatus
 
 
@@ -27,9 +27,6 @@ class ScheduleService:
     """Service for schedule operations with rotation logic."""
     
     # Anchor date for calculating alternating rotations (January 1, 2024)
-    # This date is used as a reference point for week-based rotation calculations.
-    # Weeks are calculated as complete 7-day periods since the anchor date.
-    # Week 0 includes January 1-7, 2024; Week 1 is January 8-14, etc.
     ANCHOR_DATE = datetime(2024, 1, 1)
     
     def __init__(self, session: AsyncSession):
@@ -43,14 +40,7 @@ class ScheduleService:
     ) -> List[TimeSlot]:
         """
         Get the next available time slots for a category.
-        
-        Args:
-            category_name: The name of the category
-            category_type: The type of the category
-            limit: Maximum number of slots to return (default 3)
-            
-        Returns:
-            List of the next available TimeSlot objects
+        Ensures 3 DIFFERENT days are returned in the top suggestions.
         """
         all_available_slots = []
         start_date = datetime.now()
@@ -69,108 +59,82 @@ class ScheduleService:
         if not schedules:
             return []
 
-        # Optimize: Map day_of_week to schedules for faster lookup
+        # Map day_of_week to schedules
         schedules_by_day = {s.day_of_week: s for s in schedules}
         valid_days = set(schedules_by_day.keys())
         
-        # We'll search up to 60 days ahead to find slots (prevent infinite loop)
         days_searched = 0
         current_date_cursor = start_date
 
         while len(all_available_slots) < limit and days_searched < 60:
-            # Check if current weekday is in our valid schedule days
             if current_date_cursor.weekday() in valid_days:
                 category = schedules_by_day[current_date_cursor.weekday()]
                 
                 if self._is_schedule_active(category, current_date_cursor):
                     slots = self._generate_slots(category, current_date_cursor)
                     
-                    # Filter out past slots if looking at today
                     if current_date_cursor.date() == datetime.now().date():
                         now = datetime.now()
                         slots = [s for s in slots if s.slot_datetime > now]
                     
                     if slots:
-                        available_slots = await self._filter_occupied_slots(slots, category.name)
-                        # BUG FIX: Only take the first available slot for this day
+                        # Validate availability based on strict rules
+                        available_slots = await self._filter_occupied_slots(
+                            slots, 
+                            category.name, 
+                            category.category_type,
+                            category.max_turns_per_block
+                        )
+                        
+                        # Requirement: Ensure distinct days in suggestions
                         if available_slots:
                             all_available_slots.append(available_slots[0])
             
-            # Move to next day
             current_date_cursor += timedelta(days=1)
             days_searched += 1
             
-            # If we collected more than we need, trim list (though we append one by one now)
             if len(all_available_slots) >= limit:
                 break
         
         return all_available_slots
     
     def _is_schedule_active(self, category: CategorySchedule, date: datetime) -> bool:
-        """
-        Determine if a schedule is active on a given date based on rotation type.
-        
-        Args:
-            category: The category schedule
-            date: The date to check
-        
-        Returns:
-            True if the schedule is active on this date, False otherwise
-        """
         if category.rotation_type == RotationType.FIXED:
-            # FIXED schedules are available every week
             return True
-        
         elif category.rotation_type == RotationType.ALTERNATED:
-            # ALTERNATED schedules use week-based rotation
-            # Use category-specific start date if available, otherwise fallback to global anchor
             anchor_date = category.start_date if category.start_date else self.ANCHOR_DATE.date()
-            
-            # Ensure we are comparing dates
             if isinstance(anchor_date, datetime):
                 anchor_date = anchor_date.date()
-                
-            # Calculate week number from anchor date
             days_since_anchor = (date.date() - anchor_date).days
-            
-            # For dates before anchor, treat as inactive
             if days_since_anchor < 0:
                 return False
-            
             weeks_since_anchor = days_since_anchor // 7
-            
-            # Check if this week matches the rotation pattern
-            # The schedule is active when: (current_week - anchor_week) % rotation_weeks == 0
             if category.rotation_weeks > 1:
                 return (weeks_since_anchor % category.rotation_weeks) == 0
-            return True # Should not happen for alternating schedules with weeks=1, but fallback to True
-        
+            return True
         return False
     
     def _generate_slots(self, category: CategorySchedule, date: datetime) -> List[TimeSlot]:
-        """
-        Generate all time slots for a category on a given date.
-        
-        Args:
-            category: The category schedule
-            date: The date for which to generate slots
-        
-        Returns:
-            List of TimeSlot objects representing all possible slots
-        """
         slots = []
+        slot_time = datetime.combine(date.date(), category.start_time)
         
-        # Combine date with start time
-        current_time = datetime.combine(date.date(), category.start_time)
-        
-        # Get warning message and deadline time from category
-        warning_message = category.warning_message
+        is_lab = category.category_type == CategoryType.LABORATORY
+        if is_lab:
+            arrival_time = (slot_time - timedelta(minutes=30)).strftime("%H:%M")
+            warning_message = f"⚠️ IMPORTANTE: Debe presentarse a las {arrival_time}. No recibimos muestras después de la hora límite."
+        else:
+            warning_message = category.warning_message
+            
         deadline_time = category.deadline_time.strftime("%H:%M") if category.deadline_time else None
         
-        # Generate slots by adding turn_duration repeatedly
         for turn_number in range(category.max_turns_per_block):
+            if category.deadline_time:
+                deadline_dt = datetime.combine(date.date(), category.deadline_time)
+                if slot_time >= deadline_dt:
+                    break
+
             slot = TimeSlot(
-                slot_datetime=current_time,
+                slot_datetime=slot_time,
                 category_name=category.name,
                 category_id=category.id,
                 warning_message=warning_message,
@@ -178,38 +142,35 @@ class ScheduleService:
             )
             slots.append(slot)
             
-            # Add turn_duration (in minutes) to get the next slot
-            current_time = current_time + timedelta(minutes=category.turn_duration)
+            if not is_lab:
+                slot_time = slot_time + timedelta(minutes=category.turn_duration)
         
         return slots
     
     async def _filter_occupied_slots(
         self, 
         slots: List[TimeSlot], 
-        category_name: str
+        category_name: str,
+        category_type: CategoryType,
+        max_turns: int
     ) -> List[TimeSlot]:
         """
         Filter out time slots that are already occupied by appointments.
-        
-        Args:
-            slots: List of all potential time slots
-            category_name: The name of the category (used to match with appointment.specialty)
-        
-        Returns:
-            List of available (non-occupied) TimeSlot objects
+        Enforces:
+        - Specialties: 1 turn per day limit.
+        - Laboratories: Capacity tracking for the same time.
         """
         if not slots:
             return []
         
-        # Get all slot datetimes
-        slot_datetimes = [slot.slot_datetime for slot in slots]
+        start_date = min(s.slot_datetime for s in slots).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date = start_date + timedelta(days=1)
         
-        # Query appointments that match these datetimes AND the category specialty
-        # This ensures we only block slots for appointments of the same category
         result = await self.session.execute(
             select(Appointment).where(
                 and_(
-                    Appointment.appointment_date.in_(slot_datetimes),
+                    Appointment.appointment_date >= start_date,
+                    Appointment.appointment_date < end_date,
                     Appointment.specialty == category_name,
                     Appointment.status.in_([
                         AppointmentStatus.SCHEDULED,
@@ -220,13 +181,20 @@ class ScheduleService:
         )
         occupied_appointments = result.scalars().all()
         
-        # Create a set of occupied datetimes for fast lookup
-        occupied_datetimes = {appt.appointment_date for appt in occupied_appointments}
+        if category_type == CategoryType.SPECIALTY:
+            # If any appointment exists for this specialty today, no slots available.
+            if occupied_appointments:
+                return []
+            return slots
         
-        # Filter out occupied slots
-        available_slots = [
-            slot for slot in slots 
-            if slot.slot_datetime not in occupied_datetimes
-        ]
+        elif category_type == CategoryType.LABORATORY:
+            counts = {}
+            for appt in occupied_appointments:
+                counts[appt.appointment_date] = counts.get(appt.appointment_date, 0) + 1
+            
+            return [
+                slot for slot in slots
+                if counts.get(slot.slot_datetime, 0) < max_turns
+            ]
         
-        return available_slots
+        return slots
