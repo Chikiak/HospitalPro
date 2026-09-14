@@ -39,50 +39,85 @@ async def update_medical_history(
     Requires authentication. Patients can only update their own medical history.
     Medical professionals (doctor, admin, staff) can update any patient's history.
     """
-    # Check authorization: patients can only access their own data
-    if current_user.role == UserRole.PATIENT and current_user.id != patient_id:
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Check authorization: patients can only access their own data
+        if current_user.role == UserRole.PATIENT and current_user.id != patient_id:
+            logger.warning(f"Unauthorized access attempt: User {current_user.id} tried to update patient {patient_id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene permisos para acceder a los datos de otro paciente",
+            )
+        
+        # Verify patient exists
+        user_repo = UserRepository(db)
+        patient = await user_repo.get_by_id(patient_id)
+        if not patient:
+            logger.error(f"Patient not found: {patient_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Paciente no encontrado",
+            )
+        
+        # Data Mapping: If medication_allergies is in medical_history, use it for top-level allergies if empty
+        medical_history = data.medical_history or {}
+        allergies = data.allergies
+        
+        if not allergies and medical_history and "medication_allergies" in medical_history:
+            # Join list of allergies into a string if it's a list
+            raw_allergies = medical_history["medication_allergies"]
+            if isinstance(raw_allergies, list):
+                allergies = ", ".join(raw_allergies)
+            else:
+                allergies = str(raw_allergies)
+        
+        # Get or create triage data
+        triage_repo = TriageRepository(db)
+        triage_data = await triage_repo.get_by_patient_id(patient_id)
+        
+        if triage_data:
+            # Update existing triage data
+            triage_data = await triage_repo.update(
+                triage_data=triage_data,
+                medical_history=medical_history,
+                allergies=allergies,
+            )
+        else:
+            # Create new triage data
+            triage_data = await triage_repo.create(
+                patient_id=patient_id,
+                medical_history=medical_history,
+                allergies=allergies,
+            )
+        
+        # Auto-create medical record if it doesn't exist
+        medical_record_repo = MedicalRecordRepository(db)
+        medical_record = await medical_record_repo.get_by_patient_id(patient_id)
+        if not medical_record and medical_history:
+            try:
+                await medical_record_repo.create(
+                    patient_id=patient_id,
+                    registration_survey=medical_history
+                )
+            except Exception as e:
+                # If medical record creation fails (e.g. concurrent request or data error),
+                # we MUST rollback to prevent PendingRollbackError in the rest of the request
+                await db.rollback()
+                logger.error(f"Failed to create medical record for patient {patient_id}: {e}")
+                # We continue since triage data was already saved successfully by its own repo commit
+        
+        return TriageDataResponse.model_validate(triage_data)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Unexpected error in update_medical_history for patient {patient_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tiene permisos para acceder a los datos de otro paciente",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno al guardar la información médica: {str(e)}"
         )
-    # Verify patient exists
-    user_repo = UserRepository(db)
-    patient = await user_repo.get_by_id(patient_id)
-    if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Paciente no encontrado",
-        )
-    
-    # Get or create triage data
-    triage_repo = TriageRepository(db)
-    triage_data = await triage_repo.get_by_patient_id(patient_id)
-    
-    if triage_data:
-        # Update existing triage data
-        triage_data = await triage_repo.update(
-            triage_data=triage_data,
-            medical_history=data.medical_history,
-            allergies=data.allergies,
-        )
-    else:
-        # Create new triage data
-        triage_data = await triage_repo.create(
-            patient_id=patient_id,
-            medical_history=data.medical_history,
-            allergies=data.allergies,
-        )
-    
-    # Auto-create medical record if it doesn't exist
-    medical_record_repo = MedicalRecordRepository(db)
-    medical_record = await medical_record_repo.get_by_patient_id(patient_id)
-    if not medical_record and data.medical_history:
-        await medical_record_repo.create(
-            patient_id=patient_id,
-            registration_survey=data.medical_history
-        )
-    
-    return TriageDataResponse.model_validate(triage_data)
 
 
 @router.get("/{patient_id}/medical-history", response_model=TriageDataResponse)

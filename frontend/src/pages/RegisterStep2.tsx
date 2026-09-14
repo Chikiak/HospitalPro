@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { 
-  Heart, 
-  Pill, 
-  FileText, 
-  CheckCircle, 
-  ArrowRight, 
+import {
+  Heart,
+  Pill,
+  FileText,
+  CheckCircle,
+  ArrowRight,
   AlertCircle,
   Plus,
   X
@@ -46,7 +46,7 @@ function AllergyList({ allergies, onUpdate }: { allergies: string[]; onUpdate: (
         <Pill className="inline w-4 h-4 mr-2" />
         Alergias a Medicamentos
       </label>
-      
+
       <div className="flex gap-2">
         <input
           type="text"
@@ -112,11 +112,14 @@ export default function RegisterStep2() {
   const onSubmit = async (data: MedicalHistoryFormData) => {
     try {
       setError(null)
-      
+
+      // Map allergies array to a comma-separated string for the top-level 'allergies' field
+      const allergiesString = allergies.length > 0 ? allergies.join(', ') : '';
+
       // Prepare medical history data in JSON format
       const medicalHistoryData = {
         chronic_diseases: data.chronicDiseases || '',
-        medication_allergies: allergies,
+        medication_allergies: allergies, // Still keep the array here for full context
         other_information: data.otherInformation || '',
       }
 
@@ -141,26 +144,31 @@ export default function RegisterStep2() {
         return
       }
 
-      // Send PUT/PATCH request to update medical history
-      // Note: This endpoint needs to be created in the backend
+      console.log('Saving medical history for user:', userId, medicalHistoryData);
+
+      // Send PATCH request to update medical history
       await api.patch(`/patients/${userId}/medical-history`, {
         medical_history: medicalHistoryData,
+        allergies: allergiesString, // Send as top-level string to match backend schema exactly
       })
 
       setSuccess(true)
-      
+
       // Redirect to dashboard after successful submission
       setTimeout(() => {
         navigate('/')
       }, 1500)
     } catch (err) {
-      const error = err as { response?: { data?: { detail?: string } } }
-      if (error.response?.data?.detail) {
-        setError(error.response.data.detail)
+      console.error('Medical history update error details:', err)
+      const error = err as { response?: { data?: { detail?: string }; status?: number } }
+      const detail = error.response?.data?.detail
+      const status = error.response?.status
+
+      if (detail) {
+        setError(`${detail} (Error ${status || '?'})`)
       } else {
-        setError('Error al guardar la información médica. Por favor, intente nuevamente.')
+        setError('Error al guardar la información médica. Por favor, verifique su conexión e intente nuevamente.')
       }
-      console.error('Medical history update error:', err)
     }
   }
 
