@@ -10,7 +10,7 @@ from app.schemas.category_schedule import (
     CategoryScheduleCreate,
     CategoryScheduleResponse,
 )
-from app.schemas.security import AdminCategoryRequest
+from app.schemas.security import AdminCategoryRequest, AdminDniRequest
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -167,3 +167,33 @@ async def delete_category(
     await db.execute(delete(CategorySchedule).where(CategorySchedule.name == name))
     await db.commit()
     return {"message": f"Category {name} and its schedules deleted successfully"}
+
+
+@router.post("/allowed-persons", status_code=status.HTTP_201_CREATED)
+async def add_allowed_person(
+    request: AdminDniRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Add a DNI to the allowed registrations whitelist (admin/staff with admin password)."""
+    # 1. Verify admin password
+    from app.api.endpoints.auth import verify_admin
+    from app.schemas.security import AdminVerifyRequest
+    await verify_admin(AdminVerifyRequest(password=request.admin_password), db)
+    
+    # 2. Add to allowed_persons
+    from app.models.allowed_person import AllowedPerson
+    from app.repositories.allowed_person_repository import AllowedPersonRepository
+    
+    repo = AllowedPersonRepository(db)
+    
+    # Check if already exists
+    existing = await repo.get_by_dni(request.dni)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este DNI ya está en la lista de autorizados"
+        )
+    
+    await repo.bulk_create([{"dni": request.dni, "full_name": request.full_name}])
+    
+    return {"message": f"DNI {request.dni} agregado correctamente"}

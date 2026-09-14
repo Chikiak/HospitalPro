@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { Settings, ShieldCheck } from 'lucide-react'
+import { Settings, ShieldCheck, Clock, UserCheck } from 'lucide-react'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import Tabs from '../components/ui/Tabs'
 import AdminScheduleManager from '../features/admin/AdminScheduleManager'
-
-
-
+import AdminDniManager from '../features/admin/AdminDniManager'
 
 export default function AdminSettings() {
   const [adminPassword, setAdminPassword] = useState('')
@@ -38,6 +37,11 @@ export default function AdminSettings() {
     setPendingAuthResolve(null)
     setPendingAuthReject(null)
   }
+
+  const adminTabs = [
+    { id: 'schedules', label: 'Horarios y Especialidades', icon: <Clock size={18} /> },
+    { id: 'dnis', label: 'Gestión de DNIs', icon: <UserCheck size={18} /> }
+  ]
 
   return (
     <div className="space-y-8 pb-20">
@@ -97,13 +101,24 @@ export default function AdminSettings() {
         <div className="space-y-6 lg:col-span-1">
           <div className="premium-card bg-slate-900 text-white p-6 space-y-4">
             <h3 className="font-bold uppercase tracking-widest text-xs opacity-70">Opciones</h3>
-            <p className="text-sm font-medium">Gestione aquí las especialidades, horarios y configuraciones avanzadas del sistema.</p>
+            <p className="text-sm font-medium">Gestione aquí las especialidades, horarios y acceso de nuevos pacientes al sistema.</p>
           </div>
         </div>
 
         {/* Main Content */}
         <div className="lg:col-span-3">
-          <AdminScheduleManager adminPasswordProvider={requestAdminPassword} />
+          <Tabs tabs={adminTabs}>
+            {(activeTab) => (
+              <>
+                {activeTab === 'schedules' && (
+                  <AdminScheduleManager adminPasswordProvider={requestAdminPassword} />
+                )}
+                {activeTab === 'dnis' && (
+                  <AdminDniManager adminPasswordProvider={requestAdminPassword} />
+                )}
+              </>
+            )}
+          </Tabs>
         </div>
       </div>
     </div>

@@ -19,3 +19,10 @@ class AdminCategoryRequest(BaseModel):
     category_type: CategoryType
     name: str = Field(..., max_length=100)
     # This will create a DEFAULT schedule for the new name
+
+
+class AdminDniRequest(BaseModel):
+    """Schema for adding an allowed DNI."""
+    admin_password: str = Field(..., min_length=1, description="Admin password for authorization")
+    dni: str = Field(..., min_length=7, max_length=20)
+    full_name: str | None = Field(None, max_length=255)
