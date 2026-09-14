@@ -36,15 +36,15 @@ export default function Dashboard() {
     enabled: !!user && user.role === 'patient',
   })
 
-  // Staff Appointments (All future)
+  // Staff Appointments (Today only)
   const { data: staffAppointments = [], isLoading: isLoadingStaff } = useQuery<Appointment[]>({
-    queryKey: ['appointments', 'all', 'future'],
+    queryKey: ['appointments', 'all', 'today'],
     queryFn: async () => {
       try {
         const d = new Date()
         const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
         const response = await api.get('/appointments/all', {
-          params: { start_date: today }
+          params: { start_date: today, end_date: today }
         })
         return Array.isArray(response.data) ? response.data : []
       } catch (error) {
@@ -58,13 +58,34 @@ export default function Dashboard() {
   const appointments = user?.role === 'patient' ? patientAppointments : staffAppointments
   const isLoading = user?.role === 'patient' ? isLoadingPatient : isLoadingStaff
 
-  // Filter to show only future appointments
-  const futureAppointments = useMemo(() => {
-    return appointments.filter(appointment => {
-      const appointmentDate = new Date(appointment.appointment_date)
-      return appointmentDate > new Date()
-    })
-  }, [appointments])
+  // Filter to show only future appointments for patients, or keep as is for staff (already filtered by API)
+  const displayedAppointments = useMemo(() => {
+    if (user?.role === 'patient') {
+      return appointments.filter(appointment => {
+        const appointmentDate = new Date(appointment.appointment_date)
+        return appointmentDate > new Date()
+      })
+    }
+    return appointments
+  }, [appointments, user?.role])
+
+  const handleDownload = async (appointmentId: string) => {
+    try {
+      const response = await api.get(`/appointments/${appointmentId}/export`, {
+        responseType: 'blob'
+      })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `paciente_info_${appointmentId}.xlsx`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (error) {
+      console.error('Error downloading file:', error)
+      alert('Error al descargar la información')
+    }
+  }
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
@@ -151,7 +172,7 @@ export default function Dashboard() {
                 <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
                 <p className="text-slate-400 font-medium animate-pulse">Cargando turnos...</p>
               </div>
-            ) : futureAppointments.length === 0 ? (
+            ) : displayedAppointments.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 space-y-4">
                 <Calendar className="h-16 w-16 text-slate-300" />
                 <p className="text-slate-500 font-medium">No tienes turnos programados</p>
@@ -165,7 +186,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="divide-y divide-slate-50">
-                {futureAppointments.map((appointment) => (
+                {displayedAppointments.map((appointment) => (
                   <div
                     key={appointment.id}
                     className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl transition-colors hover:bg-slate-50/80"
@@ -234,7 +255,7 @@ export default function Dashboard() {
         <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
           <div>
             <h2 className="text-xl font-black text-slate-900 tracking-tight">Turnos de Hoy</h2>
-            <p className="text-sm font-medium text-slate-500">Agenda del día</p>
+            <p className="text-sm font-medium text-slate-500">Agenda para el día de la fecha</p>
           </div>
         </div>
         <div className="p-4">
@@ -243,7 +264,7 @@ export default function Dashboard() {
               <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
               <p className="text-slate-400 font-medium animate-pulse">Cargando datos...</p>
             </div>
-          ) : futureAppointments.length === 0 ? (
+          ) : displayedAppointments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 space-y-4">
               <Calendar className="h-16 w-16 text-slate-300" />
               <p className="text-slate-500 font-medium">
@@ -252,7 +273,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
-              {futureAppointments.map((appointment) => (
+              {displayedAppointments.map((appointment) => (
                 <div
                   key={appointment.id}
                   className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl transition-colors hover:bg-slate-50/80"
@@ -270,16 +291,25 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center justify-between sm:justify-end gap-6 mt-4 sm:mt-0">
                     <div className="text-right">
-                      <p className="text-sm font-black text-slate-900">{formatDate(appointment.appointment_date)}</p>
-                      <p className="text-xs font-medium text-slate-500">{formatTime(appointment.appointment_date)}</p>
+                      <p className="text-sm font-black text-slate-900">{formatTime(appointment.appointment_date)}</p>
                     </div>
-                    <span
-                      className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm ${getStatusBadgeClass(
-                        appointment.status
-                      )}`}
-                    >
-                      {getStatusLabel(appointment.status)}
-                    </span>
+                    <div className="flex items-center gap-3">
+                        <span
+                        className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-sm ${getStatusBadgeClass(
+                            appointment.status
+                        )}`}
+                        >
+                        {getStatusLabel(appointment.status)}
+                        </span>
+                        
+                        <Button 
+                            variant="outline" 
+                            className="text-[10px] py-1 h-8"
+                            onClick={() => handleDownload(appointment.id)}
+                        >
+                            Descargar Info
+                        </Button>
+                    </div>
                   </div>
                 </div>
               ))}

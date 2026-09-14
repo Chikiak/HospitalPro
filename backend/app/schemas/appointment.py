@@ -27,6 +27,7 @@ class AppointmentResponse(BaseModel):
     
     id: int
     patient_id: int
+    patient_name: Optional[str] = None
     appointment_date: datetime
     status: AppointmentStatus
     specialty: Optional[str]

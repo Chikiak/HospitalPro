@@ -2,7 +2,9 @@ from datetime import datetime, timedelta, date as dt_date
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.core.database import get_db
 from app.models.appointment import Appointment, AppointmentStatus
@@ -80,13 +82,21 @@ async def get_my_appointments(
     """
     Get all appointments for the current authenticated patient.
     """
-    from sqlalchemy import select
-    
     query = select(Appointment).where(Appointment.patient_id == current_user.id).order_by(Appointment.appointment_date.desc())
     result = await db.execute(query)
     appointments = result.scalars().all()
     
-    return [AppointmentResponse.model_validate(app) for app in appointments]
+    return [
+        AppointmentResponse(
+            id=app.id,
+            patient_id=app.patient_id,
+            patient_name=current_user.full_name,
+            appointment_date=app.appointment_date,
+            status=app.status,
+            specialty=app.specialty,
+            notes=app.notes
+        ) for app in appointments
+    ]
 
 
 @router.post("/book", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
@@ -113,7 +123,15 @@ async def book_appointment(
     await db.commit()
     await db.refresh(new_appointment)
     
-    return AppointmentResponse.model_validate(new_appointment)
+    return AppointmentResponse(
+        id=new_appointment.id,
+        patient_id=new_appointment.patient_id,
+        patient_name=current_user.full_name,
+        appointment_date=new_appointment.appointment_date,
+        status=new_appointment.status,
+        specialty=new_appointment.specialty,
+        notes=new_appointment.notes
+    )
 
 
 @router.put("/{appointment_id}/cancel", response_model=AppointmentResponse)
@@ -127,9 +145,7 @@ async def cancel_appointment(
     Patients can only cancel their own appointments.
     Staff/Admins can cancel any appointment.
     """
-    from sqlalchemy import select
-    
-    query = select(Appointment).where(Appointment.id == appointment_id)
+    query = select(Appointment).where(Appointment.id == appointment_id).options(joinedload(Appointment.patient))
     result = await db.execute(query)
     appointment = result.scalar_one_or_none()
     
@@ -144,7 +160,15 @@ async def cancel_appointment(
     await db.commit()
     await db.refresh(appointment)
     
-    return AppointmentResponse.model_validate(appointment)
+    return AppointmentResponse(
+        id=appointment.id,
+        patient_id=appointment.patient_id,
+        patient_name=appointment.patient.full_name,
+        appointment_date=appointment.appointment_date,
+        status=appointment.status,
+        specialty=appointment.specialty,
+        notes=appointment.notes
+    )
 
 
 @router.get("/all", response_model=List[AppointmentResponse])
@@ -161,10 +185,8 @@ async def get_all_appointments(
     """
     if current_user.role not in [UserRole.ADMIN, UserRole.STAFF, UserRole.DOCTOR]:
         raise HTTPException(status_code=403, detail="Not authorized to view all appointments")
-        
-    from sqlalchemy import select, and_
     
-    query = select(Appointment)
+    query = select(Appointment).options(joinedload(Appointment.patient))
     conditions = []
     
     if start_date:
@@ -189,4 +211,86 @@ async def get_all_appointments(
     result = await db.execute(query)
     appointments = result.scalars().all()
     
-    return [AppointmentResponse.model_validate(app) for app in appointments]
+    return [
+        AppointmentResponse(
+            id=app.id,
+            patient_id=app.patient_id,
+            patient_name=app.patient.full_name,
+            appointment_date=app.appointment_date,
+            status=app.status,
+            specialty=app.specialty,
+            notes=app.notes
+        ) for app in appointments
+    ]
+
+
+@router.get("/{appointment_id}/export")
+async def export_patient_info(
+    appointment_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Export patient medical history for a specific appointment to Excel.
+    """
+    if current_user.role not in [UserRole.ADMIN, UserRole.STAFF, UserRole.DOCTOR]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    from app.models.patient import TriageData
+    import pandas as pd
+    import io
+    from fastapi.responses import StreamingResponse
+
+    # Get appointment and patient
+    query = select(Appointment).where(Appointment.id == appointment_id).options(joinedload(Appointment.patient))
+    result = await db.execute(query)
+    appointment = result.scalar_one_or_none()
+    
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    # Get triage data
+    triage_query = select(TriageData).where(TriageData.patient_id == appointment.patient_id)
+    triage_result = await db.execute(triage_query)
+    triage = triage_result.scalar_one_or_none()
+
+    # Prepare data for Excel
+    data = {
+        "Campo": [
+            "ID Paciente", 
+            "DNI", 
+            "Nombre Completo", 
+            "Especialidad del Turno", 
+            "Fecha del Turno",
+            "Enfermedades Crónicas",
+            "Alergias a Medicamentos",
+            "Otra Información"
+        ],
+        "Información": [
+            appointment.patient.id,
+            appointment.patient.dni,
+            appointment.patient.full_name,
+            appointment.specialty,
+            appointment.appointment_date.strftime("%Y-%m-%d %H:%M"),
+            triage.medical_history.get("chronic_diseases", "") if triage and triage.medical_history else "No registrado",
+            ", ".join(triage.medical_history.get("medication_allergies", [])) if triage and triage.medical_history and isinstance(triage.medical_history.get("medication_allergies"), list) else (triage.allergies or "No registrado"),
+            triage.medical_history.get("other_information", "") if triage and triage.medical_history else "No registrado"
+        ]
+    }
+
+    df = pd.DataFrame(data)
+    
+    # Create Excel in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Información del Paciente')
+    
+    output.seek(0)
+    
+    filename = f"paciente_{appointment.patient.dni}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

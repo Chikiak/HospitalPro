@@ -31,5 +31,5 @@ class Appointment(Base):
     specialty: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     notes: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     
-    # Relationships to User model (patient)
-    # Note: We don't define the back_populates here to avoid modifying the existing User model
+    # Relationships
+    patient: Mapped["User"] = relationship("User", foreign_keys=[patient_id])
