@@ -18,6 +18,8 @@ os.environ.setdefault("POSTGRES_DB", "test_db")
 os.environ.setdefault("POSTGRES_HOST", "localhost")
 os.environ.setdefault("POSTGRES_PORT", "5432")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-do-not-use-in-production")
+os.environ.setdefault("ADMIN_PASSWORD", "test-admin-password-do-not-use-in-production")
+os.environ.setdefault("STAFF_PASSWORD", "test-staff-password-do-not-use-in-production")
 os.environ.setdefault("ALGORITHM", "HS256")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 
