@@ -35,11 +35,10 @@ class AuthService:
         role: UserRole = UserRole.PATIENT,
     ) -> User:
         """Create a new user with hashed password."""
-        # Verify DNI is in the whitelist (only for patients)
-        if role == UserRole.PATIENT:
-            is_allowed = await self.allowed_person_repo.is_dni_allowed(dni)
-            if not is_allowed:
-                raise ValueError("DNI no autorizado para registro")
+        # Verify DNI is in the whitelist (unconditionally for all roles)
+        is_allowed = await self.allowed_person_repo.is_dni_allowed(dni)
+        if not is_allowed:
+            raise ValueError("DNI no autorizado para registro")
         
         hashed_password = get_password_hash(password)
         user = await self.user_repo.create(
