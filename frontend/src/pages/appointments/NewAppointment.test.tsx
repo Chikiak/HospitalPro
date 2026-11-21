@@ -1,16 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import MockAdapter from 'axios-mock-adapter'
+import api from '../../lib/api'
 import NewAppointment from './NewAppointment'
-
-// Mock axios
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn(() => Promise.reject(new Error('API not available'))),
-    post: vi.fn(() => Promise.resolve({ data: { success: true } })),
-  },
-}))
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -25,143 +19,74 @@ const createWrapper = () => {
   )
 }
 
+let mock: MockAdapter
+
+beforeEach(() => {
+  mock = new MockAdapter(api)
+  mock.onGet('/admin/schedules').reply(200, [
+    { id: 1, name: 'Cardiología', category_type: 'specialty' },
+    { id: 2, name: 'Laboratorio Clínico', category_type: 'laboratory' },
+  ])
+  mock.onGet('/appointments/slots').reply(200, [
+    {
+      slot_datetime: '2026-11-21T10:30:00',
+      category_name: 'Cardiología',
+      category_id: 1,
+    },
+  ])
+  mock.onPost('/appointments/book').reply(200, { success: true })
+})
+
+afterEach(() => {
+  mock.restore()
+  localStorage.clear()
+  vi.restoreAllMocks()
+})
+
 describe('NewAppointment', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('renders the first step (specialty selection) by default', () => {
+  it('renders step 1: servicio selection', async () => {
     render(<NewAppointment />, { wrapper: createWrapper() })
 
-    expect(screen.getByText('Nuevo Turno')).toBeInTheDocument()
-    expect(screen.getByText('Seleccione una Especialidad')).toBeInTheDocument()
-    expect(screen.getByText('Cardiología')).toBeInTheDocument()
-    expect(screen.getByText('Traumatología')).toBeInTheDocument()
-    expect(screen.getByText('Pediatría')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /agenda tu turno/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /seleccione el servicio/i })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /cardiología/i })).toBeInTheDocument()
+    )
   })
 
-  it('shows progress indicator with step 1 active', () => {
-    render(<NewAppointment />, { wrapper: createWrapper() })
-
-    const step1Text = screen.getByText('Especialidad')
-    const step1Container = step1Text.closest('div')
-    expect(step1Container).toHaveClass('text-teal-700')
-  })
-
-  it('moves to step 2 when a specialty is selected', async () => {
+  it('completes the flow: servicio → turnos disponibles → verificar datos → confirmar', async () => {
     const user = userEvent.setup()
+    const alertSpy = vi.spyOn(window, 'alert')
+
     render(<NewAppointment />, { wrapper: createWrapper() })
 
-    const cardiologyButton = screen.getByText('Cardiología')
-    await user.click(cardiologyButton)
+    expect(screen.getByRole('heading', { name: /agenda tu turno/i })).toBeInTheDocument()
 
-    await waitFor(() => {
-      expect(screen.getByText(/Turnos Disponibles - Cardiología/i)).toBeInTheDocument()
-    })
-  })
+    // Paso 1: seleccionar servicio
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /cardiología/i })).toBeInTheDocument()
+    )
+    await user.click(screen.getByRole('button', { name: /cardiología/i }))
 
-  it('displays mock turns in step 2', async () => {
-    const user = userEvent.setup()
-    render(<NewAppointment />, { wrapper: createWrapper() })
+    // Paso 2: turnos disponibles y seleccionar turno
+    await waitFor(() => expect(screen.getByText(/turnos disponibles/i)).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /10:30/ })).toBeInTheDocument()
+    )
+    await user.click(screen.getByRole('button', { name: /10:30/ }))
 
-    const cardiologyButton = screen.getByText('Cardiología')
-    await user.click(cardiologyButton)
+    // Paso 3: verificar datos
+    await waitFor(() => expect(screen.getByText(/verifica los datos/i)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/cardiología/i)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /confirmar y finalizar/i })).toBeInTheDocument()
 
-    await waitFor(() => {
-      expect(screen.getByText(/Dr\. García/i)).toBeInTheDocument()
-      expect(screen.getByText(/Dra\. Rodríguez/i)).toBeInTheDocument()
-      expect(screen.getByText(/Dr\. López/i)).toBeInTheDocument()
-    })
-  })
-
-  it('allows navigation back to step 1 from step 2', async () => {
-    const user = userEvent.setup()
-    render(<NewAppointment />, { wrapper: createWrapper() })
-
-    // Go to step 2
-    const cardiologyButton = screen.getByText('Cardiología')
-    await user.click(cardiologyButton)
-
-    await waitFor(() => {
-      expect(screen.getByText(/Turnos Disponibles/i)).toBeInTheDocument()
-    })
-
-    // Click back button
-    const backButtons = screen.getAllByRole('button', { name: /volver/i })
-    await user.click(backButtons[0])
-
-    expect(screen.getByText('Seleccione una Especialidad')).toBeInTheDocument()
-  })
-
-  it('moves to step 3 when a turn is selected', async () => {
-    const user = userEvent.setup()
-    render(<NewAppointment />, { wrapper: createWrapper() })
-
-    // Go to step 2
-    const cardiologyButton = screen.getByText('Cardiología')
-    await user.click(cardiologyButton)
-
-    await waitFor(() => {
-      expect(screen.getByText(/Dr\. García/i)).toBeInTheDocument()
-    })
-
-    // Select a turn
-    const turns = screen.getAllByRole('button')
-    const firstTurn = turns.find((btn) => btn.textContent?.includes('Dr. García'))
-    if (firstTurn) {
-      await user.click(firstTurn)
-    }
-
-    await waitFor(() => {
-      expect(screen.getByText('Confirmar Reserva')).toBeInTheDocument()
-    })
-  })
-
-  it('displays selected appointment details in step 3', async () => {
-    const user = userEvent.setup()
-    render(<NewAppointment />, { wrapper: createWrapper() })
-
-    // Go to step 2
-    const cardiologyButton = screen.getByText('Cardiología')
-    await user.click(cardiologyButton)
-
-    await waitFor(() => {
-      expect(screen.getByText(/Dr\. García/i)).toBeInTheDocument()
-    })
-
-    // Select a turn
-    const turns = screen.getAllByRole('button')
-    const firstTurn = turns.find((btn) => btn.textContent?.includes('Dr. García'))
-    if (firstTurn) {
-      await user.click(firstTurn)
-    }
-
-    await waitFor(() => {
-      expect(screen.getByText('Confirmar Reserva')).toBeInTheDocument()
-      expect(screen.getAllByText('Cardiología').length).toBeGreaterThan(0)
-    })
-  })
-
-  it('shows confirm button in step 3', async () => {
-    const user = userEvent.setup()
-    render(<NewAppointment />, { wrapper: createWrapper() })
-
-    // Navigate to step 3
-    const cardiologyButton = screen.getByText('Cardiología')
-    await user.click(cardiologyButton)
-
-    await waitFor(() => {
-      expect(screen.getByText(/Dr\. García/i)).toBeInTheDocument()
-    })
-
-    const turns = screen.getAllByRole('button')
-    const firstTurn = turns.find((btn) => btn.textContent?.includes('Dr. García'))
-    if (firstTurn) {
-      await user.click(firstTurn)
-    }
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /confirmar turno/i })).toBeInTheDocument()
-    })
+    // Confirmar
+    await user.click(screen.getByRole('button', { name: /confirmar y finalizar/i }))
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith('¡Turno reservado exitosamente!')
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /cardiología/i })).toBeInTheDocument()
+    )
   })
 })
