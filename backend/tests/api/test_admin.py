@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.category_schedule import CategorySchedule, CategoryType, RotationType
 
+ADMIN_PASSWORD = "admin1234"
+
 
 @pytest.mark.asyncio
 async def test_create_schedule_specialty(client: AsyncClient, test_db: AsyncSession):
@@ -12,6 +14,7 @@ async def test_create_schedule_specialty(client: AsyncClient, test_db: AsyncSess
     response = await client.post(
         "/admin/schedules",
         json={
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "specialty",
             "name": "Cardiology",
             "day_of_week": 0,  # Monday
@@ -42,6 +45,7 @@ async def test_create_schedule_laboratory(client: AsyncClient, test_db: AsyncSes
     response = await client.post(
         "/admin/schedules",
         json={
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "laboratory",
             "name": "Blood Test",
             "day_of_week": 2,  # Wednesday
@@ -56,7 +60,8 @@ async def test_create_schedule_laboratory(client: AsyncClient, test_db: AsyncSes
     assert response.status_code == 201
     data = response.json()
     assert data["category_type"] == "laboratory"
-    assert data["name"] == "Blood Test"
+    # El validador de CategoryScheduleCreate fuerza el nombre de laboratorio
+    assert data["name"] == "Laboratorio"
     assert data["day_of_week"] == 2
     assert data["rotation_type"] == "alternated"
     assert data["rotation_weeks"] == 2
@@ -69,6 +74,7 @@ async def test_update_existing_schedule(client: AsyncClient, test_db: AsyncSessi
     initial_response = await client.post(
         "/admin/schedules",
         json={
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "specialty",
             "name": "Neurology",
             "day_of_week": 1,  # Tuesday
@@ -83,12 +89,14 @@ async def test_update_existing_schedule(client: AsyncClient, test_db: AsyncSessi
     initial_data = initial_response.json()
     schedule_id = initial_data["id"]
     
-    # Update with different values but same category_type and day_of_week
+    # Update with different values but same name and day_of_week
+    # (el endpoint solo reutiliza el registro si coinciden name y day_of_week)
     update_response = await client.post(
         "/admin/schedules",
         json={
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "specialty",
-            "name": "Neurology Advanced",  # Updated name
+            "name": "Neurology",  # Same name -> matches existing record
             "day_of_week": 1,  # Same Tuesday
             "start_time": "14:00:00",  # Updated time
             "turn_duration": 60,  # Updated duration
@@ -101,9 +109,9 @@ async def test_update_existing_schedule(client: AsyncClient, test_db: AsyncSessi
     assert update_response.status_code == 201
     updated_data = update_response.json()
     
-    # Should have the same ID (updated, not created new)
+    # Should have the same ID (updated in place, not created new)
     assert updated_data["id"] == schedule_id
-    assert updated_data["name"] == "Neurology Advanced"
+    assert updated_data["name"] == "Neurology"
     assert updated_data["start_time"] == "14:00:00"
     assert updated_data["turn_duration"] == 60
     assert updated_data["max_turns_per_block"] == 5
@@ -118,6 +126,7 @@ async def test_different_category_types_same_day(client: AsyncClient, test_db: A
     specialty_response = await client.post(
         "/admin/schedules",
         json={
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "specialty",
             "name": "Dermatology",
             "day_of_week": 0,  # Monday
@@ -134,6 +143,7 @@ async def test_different_category_types_same_day(client: AsyncClient, test_db: A
     lab_response = await client.post(
         "/admin/schedules",
         json={
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "laboratory",
             "name": "X-Ray",
             "day_of_week": 0,  # Monday (same day)
@@ -171,6 +181,7 @@ async def test_list_schedules_with_data(client: AsyncClient, test_db: AsyncSessi
     # Create multiple schedules
     schedules_to_create = [
         {
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "specialty",
             "name": "Cardiology",
             "day_of_week": 0,
@@ -181,6 +192,7 @@ async def test_list_schedules_with_data(client: AsyncClient, test_db: AsyncSessi
             "rotation_weeks": 1,
         },
         {
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "specialty",
             "name": "Neurology",
             "day_of_week": 1,
@@ -191,6 +203,7 @@ async def test_list_schedules_with_data(client: AsyncClient, test_db: AsyncSessi
             "rotation_weeks": 1,
         },
         {
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "laboratory",
             "name": "Blood Test",
             "day_of_week": 2,
@@ -265,11 +278,32 @@ async def test_create_schedule_invalid_turn_duration(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_create_schedule_without_admin_password(client: AsyncClient):
+    """Test creating schedule without admin_password: 422 (campo obligatorio)."""
+    response = await client.post(
+        "/admin/schedules",
+        json={
+            "category_type": "specialty",
+            "name": "Cardiology",
+            "day_of_week": 0,
+            "start_time": "09:00:00",
+            "turn_duration": 30,
+            "max_turns_per_block": 4,
+            "rotation_type": "fixed",
+            "rotation_weeks": 1,
+        },
+    )
+    
+    assert response.status_code == 422  # Missing required admin_password
+
+
+@pytest.mark.asyncio
 async def test_create_schedule_default_rotation_weeks(client: AsyncClient, test_db: AsyncSession):
     """Test creating schedule with default rotation_weeks."""
     response = await client.post(
         "/admin/schedules",
         json={
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "specialty",
             "name": "Orthopedics",
             "day_of_week": 3,
