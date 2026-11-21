@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.database import get_db
+from app.core.deps import get_current_user
 from app.models.appointment import Appointment, AppointmentStatus
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.services.schedule_service import ScheduleService
 from app.schemas.appointment import (
     AppointmentResponse,
@@ -41,37 +42,6 @@ async def get_slots(
             deadline_time=slot.deadline_time
         ) for slot in slots
     ]
-
-
-from fastapi.security import OAuth2PasswordBearer
-from app.core.security import decode_access_token
-from app.models.user import User
-
-reusable_oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/login/access-token")
-
-async def get_current_user(
-    token: Annotated[str, Depends(reusable_oauth2)],
-    db: Annotated[AsyncSession, Depends(get_db)]
-) -> User:
-    payload = decode_access_token(token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    dni = payload.get("sub")
-    if not dni:
-        raise HTTPException(status_code=401, detail="Invalid token")
-        
-    from app.services.auth_service import AuthService
-    auth_service = AuthService(db)
-    user = await auth_service.get_user_by_dni(dni)
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
 
 
 @router.get("/me", response_model=List[AppointmentResponse])
