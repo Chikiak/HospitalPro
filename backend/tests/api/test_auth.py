@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import patch
 
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.repositories.allowed_person_repository import AllowedPersonRepository
 
 
@@ -182,3 +182,63 @@ async def test_staff_login_wrong_password(client: AsyncClient):
         
         assert response.status_code == 401
         assert "incorrect" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["admin", "doctor", "staff"])
+async def test_register_ignores_client_role(client: AsyncClient, test_db: AsyncSession, role: str):
+    """Registration ignores client-supplied role; always creates patient."""
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "12345678901"}])
+
+    response = await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "12345678901",
+            "password": "securepass123",
+            "full_name": "Test User",
+            "role": role,
+        },
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["role"] == "patient"
+
+    # Verify persisted role is patient
+    result = await test_db.get(User, data["id"])
+    assert result is not None
+    assert result.role == UserRole.PATIENT
+
+
+@pytest.mark.asyncio
+async def test_auth_error_messages_are_uniform(client: AsyncClient, test_db: AsyncSession):
+    """Login, staff login and verify-admin all return the same 401 detail."""
+    # Login with wrong credentials
+    login_resp = await client.post(
+        "/auth/login/access-token",
+        json={"dni": "99999999999", "password": "wrongpassword"},
+    )
+    assert login_resp.status_code == 401
+    login_detail = login_resp.json()["detail"]
+
+    # Staff login with wrong password
+    with patch("app.api.endpoints.auth.settings.STAFF_PASSWORD", "correct-staff-password"):
+        staff_resp = await client.post(
+            "/auth/login/staff",
+            json={"password": "wrong-password"},
+        )
+    assert staff_resp.status_code == 401
+    staff_detail = staff_resp.json()["detail"]
+
+    # Verify-admin with wrong password
+    verify_resp = await client.post(
+        "/auth/verify-admin",
+        json={"password": "wrongpassword"},
+    )
+    assert verify_resp.status_code == 401
+    verify_detail = verify_resp.json()["detail"]
+
+    assert login_detail == "Credenciales incorrectas"
+    assert staff_detail == "Credenciales incorrectas"
+    assert verify_detail == "Credenciales incorrectas"

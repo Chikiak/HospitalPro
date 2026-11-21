@@ -56,7 +56,7 @@ async def test_register_with_unauthorized_dni(client: AsyncClient, test_db: Asyn
 
 @pytest.mark.asyncio
 async def test_register_non_patient_without_whitelist(client: AsyncClient, test_db: AsyncSession):
-    """Test that non-patient roles can register without being on whitelist."""
+    """Non-patient roles cannot register without whitelist (bug E-01 closed)."""
     response = await client.post(
         "/auth/users/register",
         json={
@@ -66,11 +66,28 @@ async def test_register_non_patient_without_whitelist(client: AsyncClient, test_
             "role": "doctor",
         },
     )
-    
-    # Should succeed because whitelist check only applies to patients
-    assert response.status_code == 201
+
+    # Whitelist is unconditional: unauthorized DNI → 403 regardless of role
+    assert response.status_code == 403
     data = response.json()
-    assert data["role"] == "doctor"
+    assert "DNI no autorizado" in data["detail"]
+
+
+@pytest.mark.asyncio
+async def test_register_requires_whitelist_for_any_role(client: AsyncClient, test_db: AsyncSession):
+    """Any role with an unauthorized DNI gets 403."""
+    for role in ["admin", "doctor", "staff", "patient"]:
+        response = await client.post(
+            "/auth/users/register",
+            json={
+                "dni": "99999999999",
+                "password": "securepass123",
+                "full_name": "Unauthorized User",
+                "role": role,
+            },
+        )
+        assert response.status_code == 403, f"Role {role} should be rejected"
+        assert "DNI no autorizado" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
