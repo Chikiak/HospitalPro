@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import AsyncGenerator, Generator
 
 import httpx
@@ -8,8 +9,21 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+# Test environment variables (only if not already defined) so the application
+# settings and the app itself can be imported without a .env file or real
+# credentials. Values are test-only and must never be used in production.
+os.environ.setdefault("POSTGRES_USER", "test_user")
+os.environ.setdefault("POSTGRES_PASSWORD", "test_password")
+os.environ.setdefault("POSTGRES_DB", "test_db")
+os.environ.setdefault("POSTGRES_HOST", "localhost")
+os.environ.setdefault("POSTGRES_PORT", "5432")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-do-not-use-in-production")
+os.environ.setdefault("ALGORITHM", "HS256")
+os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+
 from app.core.database import Base, get_db
 from app.main import app
+from app.core.security import create_access_token
 
 # Use in-memory SQLite for testing
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -66,3 +80,9 @@ async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield ac
     
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def make_token(dni: str, role: str) -> str:
+    """Create a JWT access token for the given DNI and role (test helper)."""
+    return create_access_token(data={"sub": dni, "role": role})
