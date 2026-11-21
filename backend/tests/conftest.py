@@ -90,3 +90,12 @@ def make_token():
         return create_access_token(data={"sub": dni, "role": role})
 
     return _make_token
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Limpia el almacenamiento del limitador de tasa antes de cada test para aislamiento."""
+    try:
+        app.state.limiter._storage.reset()
+    except AttributeError:
+        pass

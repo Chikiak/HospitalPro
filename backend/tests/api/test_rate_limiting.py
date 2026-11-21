@@ -10,6 +10,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.main import app
 from app.models.user import UserRole
 from app.repositories.allowed_person_repository import AllowedPersonRepository
 
@@ -157,3 +158,39 @@ async def test_rate_limiting_allows_normal_use(client: AsyncClient, test_db: Asy
         # Should be able to login successfully
         assert response.status_code == 200
         assert "access_token" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_register_rate_limit(client: AsyncClient, test_db: AsyncSession):
+    """Register endpoint enforces 5 requests per minute; 6th returns 429."""
+    # Reset the in-memory limiter storage so this test is isolated
+    app.state.limiter._storage.reset()
+
+    # Add DNI to whitelist
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "55555555555"}])
+
+    # First 5 registrations should succeed (or fail with non-429 errors)
+    for i in range(5):
+        response = await client.post(
+            "/auth/users/register",
+            json={
+                "dni": f"555555555{i}5",
+                "password": "securepass123",
+                "full_name": f"Rate Limit User {i}",
+                "role": "patient",
+            },
+        )
+        assert response.status_code in (201, 403, 409, 422), f"Request {i} failed with {response.status_code}"
+
+    # 6th request should be rate limited
+    response = await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "55555555599",
+            "password": "securepass123",
+            "full_name": "Rate Limit User 6",
+            "role": "patient",
+        },
+    )
+    assert response.status_code == 429, f"Expected 429, got {response.status_code}"
