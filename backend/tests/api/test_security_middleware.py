@@ -122,3 +122,39 @@ async def test_production_trusted_host_configuration_requires_env_var():
     # This is tested by the validation logic in main.py:
     # if ENVIRONMENT == "production" and not allowed_hosts_env: raise ValueError(...)
 
+
+@pytest.mark.asyncio
+async def test_cors_allows_configured_origin(client: AsyncClient):
+    """AC5: el origen configurado en ALLOWED_ORIGINS recibe la cabecera CORS."""
+    response = await client.options(
+        "/health",
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+@pytest.mark.asyncio
+async def test_cors_rejects_unknown_origin(client: AsyncClient):
+    """AC5: un origen no configurado no recibe cabecera CORS."""
+    response = await client.options(
+        "/health",
+        headers={"Origin": "http://evil.example"},
+    )
+    assert "access-control-allow-origin" not in response.headers
+
+
+@pytest.mark.asyncio
+async def test_cors_methods_are_explicit(client: AsyncClient):
+    """AC6: los métodos CORS son explícitos (no comodín) e incluyen DELETE."""
+    response = await client.options(
+        "/health",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "DELETE",
+        },
+    )
+    allow_methods = response.headers["access-control-allow-methods"]
+    methods = [m.strip() for m in allow_methods.split(",")]
+    assert "*" not in methods
+    assert "DELETE" in methods
+
