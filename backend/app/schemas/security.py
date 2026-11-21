@@ -4,13 +4,13 @@ from app.models.category_schedule import CategoryType
 
 class AdminVerifyRequest(BaseModel):
     """Schema for admin password verification."""
-    password: str = Field(..., min_length=1, description="Admin password")
+    password: str = Field(..., min_length=8, description="Admin password")
 
 
 class StaffPasswordUpdateRequest(BaseModel):
     """Schema for updating the staff password."""
-    admin_password: str = Field(..., min_length=1, description="Admin password for authorization")
-    new_staff_password: str = Field(..., min_length=1, description="New staff password")
+    admin_password: str = Field(..., min_length=8, description="Admin password for authorization")
+    new_staff_password: str = Field(..., min_length=8, description="New staff password")
 
 
 class AdminCategoryRequest(BaseModel):
@@ -24,5 +24,5 @@ class AdminCategoryRequest(BaseModel):
 class AdminDniRequest(BaseModel):
     """Schema for adding an allowed DNI."""
     admin_password: str = Field(..., min_length=1, description="Admin password for authorization")
-    dni: str = Field(..., min_length=7, max_length=20)
+    dni: str = Field(..., min_length=11, max_length=11, pattern=r"^\d{11}$")
     full_name: str | None = Field(None, max_length=255)
