@@ -83,6 +83,10 @@ async def client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest.fixture
-def make_token(dni: str, role: str) -> str:
-    """Create a JWT access token for the given DNI and role (test helper)."""
-    return create_access_token(data={"sub": dni, "role": role})
+def make_token():
+    """Devuelve un helper `make_token(dni, role)` que crea un JWT de prueba."""
+
+    def _make_token(dni: str, role: str) -> str:
+        return create_access_token(data={"sub": dni, "role": role})
+
+    return _make_token
