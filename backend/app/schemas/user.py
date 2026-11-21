@@ -6,7 +6,7 @@ from app.models.user import UserRole
 class UserCreate(BaseModel):
     """Schema for creating a user."""
     dni: str = Field(..., min_length=11, max_length=11, pattern=r"^\d{11}$", description="DNI/Cedula")
-    password: str = Field(..., min_length=6, description="Password")
+    password: str = Field(..., min_length=8, description="Password")
     full_name: str = Field(..., min_length=1, max_length=255, description="Full name")
     role: UserRole = Field(default=UserRole.PATIENT, description="User role")
 
