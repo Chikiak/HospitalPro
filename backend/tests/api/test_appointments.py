@@ -120,6 +120,40 @@ async def test_appointments_me_inactive_user_403(client: AsyncClient, test_db: A
 
 
 @pytest.mark.asyncio
+async def test_appointments_me_active_user_200(client: AsyncClient, test_db: AsyncSession):
+    """GET /appointments/me con usuario activo: 200 y sus citas (AC6)."""
+    active_user = User(
+        dni="ACTIVO001",
+        hashed_password="hashed",
+        full_name="Activo Uno",
+        role=UserRole.PATIENT,
+        is_active=True,
+    )
+    test_db.add(active_user)
+    await test_db.flush()
+
+    appointment = Appointment(
+        patient_id=active_user.id,
+        appointment_date=datetime.now() + timedelta(days=7),
+        specialty="Cardiologia",
+        status=AppointmentStatus.SCHEDULED,
+    )
+    test_db.add(appointment)
+    await test_db.commit()
+
+    token = create_access_token({"sub": "ACTIVO001", "role": "patient"})
+
+    response = await client.get(
+        "/appointments/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert any(app["patient_name"] == "Activo Uno" and app["specialty"] == "Cardiologia" for app in data)
+
+
+@pytest.mark.asyncio
 async def test_appointments_book_inactive_user_403(client: AsyncClient, test_db: AsyncSession):
     """POST /appointments/book con usuario inactivo: 403 y ninguna fila creada (AC3)."""
     inactive_user = User(
@@ -147,6 +181,7 @@ async def test_appointments_book_inactive_user_403(client: AsyncClient, test_db:
     )
 
     assert response.status_code == 403
+    assert response.json()["detail"] == "User account is not active"
 
     result = await test_db.execute(
         select(Appointment).where(Appointment.patient_id == inactive_user.id)
@@ -184,6 +219,7 @@ async def test_appointments_cancel_inactive_user_403(client: AsyncClient, test_d
     )
 
     assert response.status_code == 403
+    assert response.json()["detail"] == "User account is not active"
 
     result = await test_db.execute(select(Appointment).where(Appointment.id == appointment.id))
     stored = result.scalar_one()
@@ -212,6 +248,7 @@ async def test_appointments_all_inactive_user_403(client: AsyncClient, test_db: 
     )
 
     assert response.status_code == 403
+    assert response.json()["detail"] == "User account is not active"
 
 
 @pytest.mark.asyncio
@@ -254,6 +291,7 @@ async def test_appointments_export_inactive_user_403(client: AsyncClient, test_d
     )
 
     assert response.status_code == 403
+    assert response.json()["detail"] == "User account is not active"
 
 
 @pytest.mark.asyncio
