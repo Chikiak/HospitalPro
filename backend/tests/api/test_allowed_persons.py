@@ -2,6 +2,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.user import User, UserRole
 from app.repositories.allowed_person_repository import AllowedPersonRepository
 
 
@@ -73,8 +74,8 @@ async def test_register_non_patient_without_whitelist(client: AsyncClient, test_
 
 
 @pytest.mark.asyncio
-async def test_bulk_create_allowed_persons(client: AsyncClient, test_db: AsyncSession):
-    """Test bulk creation of allowed persons."""
+async def test_bulk_create_allowed_persons_without_token(client: AsyncClient):
+    """POST /patients/allowed-persons/bulk sin token: 401."""
     response = await client.post(
         "/patients/allowed-persons/bulk",
         json={
@@ -86,17 +87,61 @@ async def test_bulk_create_allowed_persons(client: AsyncClient, test_db: AsyncSe
         },
     )
     
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "role,role_enum",
+    [
+        ("admin", UserRole.ADMIN),
+        ("staff", UserRole.STAFF),
+    ],
+)
+async def test_bulk_create_allowed_persons_with_admin_token(
+    client: AsyncClient,
+    test_db: AsyncSession,
+    make_token,
+    role: str,
+    role_enum: UserRole,
+):
+    """POST /patients/allowed-persons/bulk con token rol admin o staff: 201 con count == 3 (AC4)."""
+    dni = f"ADMIN{role.upper()}001"
+    test_db.add(
+        User(
+            dni=dni,
+            hashed_password="hashed",
+            full_name=f"{role.title()} User",
+            role=role_enum,
+            is_active=True,
+        )
+    )
+    await test_db.commit()
+
+    token = make_token(dni=dni, role=role)
+    response = await client.post(
+        "/patients/allowed-persons/bulk",
+        json={
+            "persons": [
+                {"dni": "11111111111", "full_name": "Person One"},
+                {"dni": "22222222222", "full_name": "Person Two"},
+                {"dni": "33333333333"},
+            ]
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
     assert response.status_code == 201
     data = response.json()
     assert data["count"] == 3
-    
-    # Verify they were created
+
+    # Verify they were created en BD
     allowed_repo = AllowedPersonRepository(test_db)
     person1 = await allowed_repo.get_by_dni("11111111111")
     assert person1 is not None
     assert person1.full_name == "Person One"
     assert person1.is_registered is False
-    
+
     person3 = await allowed_repo.get_by_dni("33333333333")
     assert person3 is not None
     assert person3.full_name is None
