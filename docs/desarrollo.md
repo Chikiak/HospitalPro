@@ -57,4 +57,58 @@ Estos 5 fallos están fuera del alcance de `F1-01` (no se modifica nada en `back
 ## Notas
 
 - No se requieren credenciales reales ni una base de datos PostgreSQL para correr los tests.
-- La sección de frontend y CI de este documento la completa F1-02.
+## Entorno de desarrollo · Frontend
+
+Desde la raíz del repositorio:
+
+```powershell
+# 1. Instalar dependencias del frontend
+cd frontend
+npm ci
+
+# 2. Ejecutar los tests (Vitest sobre jsdom)
+npm run test:run
+
+# 3. Lint (ESLint)
+npm run lint
+
+# 4. Build (TypeScript + Vite)
+npm run build
+```
+
+La suite de frontend usa una única configuración de Vitest en
+`vite.config.ts` (`globals`, `jsdom`, `setupFiles: ./src/test/setup.ts`).
+Los tests se ejecutan contra la UI actual con Testing Library y mockean solo
+la capa HTTP con `axios-mock-adapter`; no se mockean componentes y no se
+modifica el código de la aplicación para pasar los tests.
+
+## Ejecutar el CI en local
+
+El pipeline de `.github/workflows/ci.yml` se dispara en `push` y
+`pull_request` con jobs separados de backend y frontend; el fallo de cualquier
+job rompe el pipeline. Reproducir localmente:
+
+Backend:
+
+```powershell
+cd backend
+pip install -r requirements.txt
+pip install ruff pip-audit
+python -m pytest -q
+pip-audit -r requirements.txt
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm ci
+npm run lint
+npm run test:run
+npm run build
+npm audit
+```
+
+La detección de secretos con `gitleaks` se instala en el job de CI (no se
+agrega a `requirements.txt` ni a `package.json`).
+
