@@ -116,7 +116,7 @@ async def login_staff(
 from app.schemas.security import AdminVerifyRequest, StaffPasswordUpdateRequest
 
 @router.post("/verify-admin", status_code=status.HTTP_200_OK)
-@limiter.limit("3/min")
+@limiter.limit("3/minute")
 async def verify_admin(
     request: Request,
     credentials: AdminVerifyRequest,
@@ -159,7 +159,7 @@ async def verify_admin(
 
 
 @router.post("/update-staff-password", status_code=status.HTTP_200_OK)
-@limiter.limit("3/min")
+@limiter.limit("3/minute")
 async def update_staff_password(
     request: Request,
     request_data: StaffPasswordUpdateRequest,

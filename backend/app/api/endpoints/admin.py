@@ -23,7 +23,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
     response_model=CategoryScheduleResponse,
     status_code=status.HTTP_201_CREATED,
 )
-@limiter.limit("10/min")
+@limiter.limit("10/minute")
 async def create_or_update_schedule(
     request: Request,
     schedule_data: CategoryScheduleCreate,
@@ -129,7 +129,7 @@ async def list_schedules(
 
 
 @router.post("/categories", status_code=status.HTTP_201_CREATED)
-@limiter.limit("10/min")
+@limiter.limit("10/minute")
 async def create_category(
     request: Request,
     request_data: AdminCategoryRequest,
@@ -158,7 +158,7 @@ async def create_category(
 
 
 @router.delete("/categories/{name}", status_code=status.HTTP_200_OK)
-@limiter.limit("10/min")
+@limiter.limit("10/minute")
 async def delete_category(
     request: Request,
     name: str,
@@ -174,7 +174,7 @@ async def delete_category(
 
 
 @router.post("/allowed-persons", status_code=status.HTTP_201_CREATED)
-@limiter.limit("10/min")
+@limiter.limit("10/minute")
 async def add_allowed_person(
     request: Request,
     request_data: AdminDniRequest,
