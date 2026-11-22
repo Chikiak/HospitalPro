@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import create_access_token
+from app.core.security import create_access_token, get_password_hash, verify_password
 from app.core.rate_limit import limiter
 from app.models.user import UserRole
 from app.schemas.auth import LoginRequest, StaffLoginRequest, Token
@@ -15,6 +15,11 @@ from app.schemas.user import UserCreate, UserResponse
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+
+
+def _is_bcrypt_hash(value: str | None) -> bool:
+    """Devuelve True si el valor tiene forma de hash bcrypt ($2b$)."""
+    return bool(value) and value.startswith("$2b$")
 
 
 @router.post("/login/access-token", response_model=Token)
@@ -57,20 +62,28 @@ async def login_staff(
     from app.models.system_config import SystemConfig
     from app.models.user import User
     
-    # Try to get persistent staff password from database
     result = await db.execute(select(SystemConfig).where(SystemConfig.key == "staff_password"))
     config = result.scalar_one_or_none()
     
-    current_staff_password = config.value if config else settings.STAFF_PASSWORD
+    stored = config.value if config else None
     
-    if not current_staff_password:
+    if not stored:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Staff authentication is not configured",
         )
     
-    # Use constant-time comparison to prevent timing attacks
-    if not secrets.compare_digest(credentials.password, current_staff_password):
+    if not _is_bcrypt_hash(stored):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Credenciales de staff en texto plano. Ejecutar "
+                "backend/scripts/hash_config_passwords.py para convertir "
+                "system_config a hash bcrypt antes de autenticar."
+            ),
+        )
+    
+    if not verify_password(credentials.password, stored):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas",
@@ -82,11 +95,9 @@ async def login_staff(
     staff_user = result.scalar_one_or_none()
     
     if not staff_user:
-        # Create the staff user if it doesn't exist
-        from app.core.security import get_password_hash
         staff_user = User(
             dni="staff",
-            hashed_password=get_password_hash(current_staff_password),
+            hashed_password=stored,
             full_name="Personal Administrativo",
             role=UserRole.STAFF,
             is_active=True
@@ -112,13 +123,28 @@ async def verify_admin(
     from sqlalchemy import select
     from app.models.system_config import SystemConfig
     
-    # Try to get persistent admin password from database
     result = await db.execute(select(SystemConfig).where(SystemConfig.key == "admin_password"))
     config = result.scalar_one_or_none()
     
-    current_admin_password = config.value if config else settings.ADMIN_PASSWORD
+    stored = config.value if config else None
     
-    if not secrets.compare_digest(credentials.password, current_admin_password):
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin authentication is not configured",
+        )
+    
+    if not _is_bcrypt_hash(stored):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Credenciales de admin en texto plano. Ejecutar "
+                "backend/scripts/hash_config_passwords.py para convertir "
+                "system_config a hash bcrypt antes de autenticar."
+            ),
+        )
+    
+    if not verify_password(credentials.password, stored):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas",
@@ -144,9 +170,9 @@ async def update_staff_password(
     config = result.scalar_one_or_none()
     
     if config:
-        config.value = request.new_staff_password
+        config.value = get_password_hash(request.new_staff_password)
     else:
-        config = SystemConfig(key="staff_password", value=request.new_staff_password)
+        config = SystemConfig(key="staff_password", value=get_password_hash(request.new_staff_password))
         db.add(config)
     
     await db.commit()

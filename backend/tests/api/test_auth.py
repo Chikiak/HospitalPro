@@ -1,8 +1,8 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import patch
-
+from app.core.security import get_password_hash, verify_password
+from app.models.system_config import SystemConfig
 from app.models.user import User, UserRole
 from app.repositories.allowed_person_repository import AllowedPersonRepository
 
@@ -151,37 +151,41 @@ async def test_login_nonexistent_user(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_staff_login_success(client: AsyncClient):
-    """Test successful staff login."""
-    with patch("app.api.endpoints.auth.settings.STAFF_PASSWORD", "correct-staff-password"):
-        response = await client.post(
-            "/auth/login/staff",
-            json={
-                "password": "correct-staff-password",
-            },
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert "access_token" in data
-        assert data["token_type"] == "bearer"
-        assert isinstance(data["access_token"], str)
-        assert len(data["access_token"]) > 0
+async def test_staff_login_success(client: AsyncClient, test_db: AsyncSession):
+    """Test successful staff login with hashed password in system_config."""
+    test_db.add(SystemConfig(key="staff_password", value=get_password_hash("correct-staff-password")))
+    await test_db.commit()
+
+    response = await client.post(
+        "/auth/login/staff",
+        json={
+            "password": "correct-staff-password",
+        },
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert isinstance(data["access_token"], str)
+    assert len(data["access_token"]) > 0
 
 
 @pytest.mark.asyncio
-async def test_staff_login_wrong_password(client: AsyncClient):
+async def test_staff_login_wrong_password(client: AsyncClient, test_db: AsyncSession):
     """Test staff login with wrong password returns 401."""
-    with patch("app.api.endpoints.auth.settings.STAFF_PASSWORD", "correct-staff-password"):
-        response = await client.post(
-            "/auth/login/staff",
-            json={
-                "password": "wrong-password",
-            },
-        )
-        
-        assert response.status_code == 401
-        assert "incorrect" in response.json()["detail"].lower()
+    test_db.add(SystemConfig(key="staff_password", value=get_password_hash("correct-staff-password")))
+    await test_db.commit()
+
+    response = await client.post(
+        "/auth/login/staff",
+        json={
+            "password": "wrong-password",
+        },
+    )
+    
+    assert response.status_code == 401
+    assert "incorrect" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -222,12 +226,15 @@ async def test_auth_error_messages_are_uniform(client: AsyncClient, test_db: Asy
     assert login_resp.status_code == 401
     login_detail = login_resp.json()["detail"]
 
-    # Staff login with wrong password
-    with patch("app.api.endpoints.auth.settings.STAFF_PASSWORD", "correct-staff-password"):
-        staff_resp = await client.post(
-            "/auth/login/staff",
-            json={"password": "wrong-password"},
-        )
+    # Staff login with wrong password (hashed in system_config)
+    test_db.add(SystemConfig(key="staff_password", value=get_password_hash("correct-staff-password")))
+    test_db.add(SystemConfig(key="admin_password", value=get_password_hash("admin-password-1234")))
+    await test_db.commit()
+
+    staff_resp = await client.post(
+        "/auth/login/staff",
+        json={"password": "wrong-password"},
+    )
     assert staff_resp.status_code == 401
     staff_detail = staff_resp.json()["detail"]
 
@@ -242,3 +249,125 @@ async def test_auth_error_messages_are_uniform(client: AsyncClient, test_db: Asy
     assert login_detail == "Credenciales incorrectas"
     assert staff_detail == "Credenciales incorrectas"
     assert verify_detail == "Credenciales incorrectas"
+
+
+@pytest.mark.asyncio
+async def test_staff_login_against_hash(client: AsyncClient, test_db: AsyncSession):
+    """staff_password hasheado en system_config: login correcto -> 200 con token."""
+    test_db.add(SystemConfig(key="staff_password", value=get_password_hash("correct-staff-password")))
+    await test_db.commit()
+
+    response = await client.post(
+        "/auth/login/staff",
+        json={"password": "correct-staff-password"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+
+
+@pytest.mark.asyncio
+async def test_staff_login_wrong_password_against_hash(client: AsyncClient, test_db: AsyncSession):
+    """staff_password hasheado: contraseña incorrecta -> 401 "Credenciales incorrectas"."""
+    test_db.add(SystemConfig(key="staff_password", value=get_password_hash("correct-staff-password")))
+    await test_db.commit()
+
+    response = await client.post(
+        "/auth/login/staff",
+        json={"password": "wrong-password"},
+    )
+
+    assert response.status_code == 401
+    assert "incorrect" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_staff_login_plaintext_value_returns_503(client: AsyncClient, test_db: AsyncSession):
+    """staff_password en texto plano -> 503 que nombra el script de conversión, sin comparar en plano."""
+    test_db.add(SystemConfig(key="staff_password", value="valor-en-texto-plano"))
+    await test_db.commit()
+
+    response = await client.post(
+        "/auth/login/staff",
+        json={"password": "valor-en-texto-plano"},
+    )
+
+    assert response.status_code == 503
+    assert "hash_config_passwords.py" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_update_staff_password_stores_hash(client: AsyncClient, test_db: AsyncSession):
+    """AC1: update_staff_password guarda hash bcrypt de la nueva contraseña."""
+    admin_pass = "AdminPass1234"
+    test_db.add(SystemConfig(key="admin_password", value=get_password_hash(admin_pass)))
+    await test_db.commit()
+
+    response = await client.post(
+        "/auth/update-staff-password",
+        json={
+            "admin_password": admin_pass,
+            "new_staff_password": "NewPass1234",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Staff password updated successfully"
+
+    result = await test_db.execute(
+        __import__("sqlalchemy").select(SystemConfig).where(SystemConfig.key == "staff_password")
+    )
+    stored = result.scalar_one_or_none()
+    assert stored is not None
+    assert stored.value.startswith("$2b$"), stored.value
+    assert stored.value != "NewPass1234"
+    assert verify_password("NewPass1234", stored.value) is True
+
+
+@pytest.mark.asyncio
+async def test_verify_admin_against_hash(client: AsyncClient, test_db: AsyncSession):
+    """AC7: verify_admin contra valor hasheado: correcto 200, incorrecto 401."""
+    admin_pass = "AdminPass1234"
+    test_db.add(SystemConfig(key="admin_password", value=get_password_hash(admin_pass)))
+    await test_db.commit()
+
+    ok = await client.post("/auth/verify-admin", json={"password": admin_pass})
+    assert ok.status_code == 200
+    assert ok.json() == {"message": "Admin verified"}
+
+    bad = await client.post("/auth/verify-admin", json={"password": "wrong-password"})
+    assert bad.status_code == 401
+    assert "incorrect" in bad.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_auth_error_messages_are_uniform_with_hashes(client: AsyncClient, test_db: AsyncSession):
+    """Login, staff login y verify-admin devuelven el mismo 401 con valores hasheados en system_config."""
+    staff_pass = "correct-staff-password"
+    admin_pass = "AdminPass1234"
+    test_db.add(SystemConfig(key="staff_password", value=get_password_hash(staff_pass)))
+    test_db.add(SystemConfig(key="admin_password", value=get_password_hash(admin_pass)))
+    await test_db.commit()
+
+    login_resp = await client.post(
+        "/auth/login/access-token",
+        json={"dni": "99999999999", "password": "wrongpassword"},
+    )
+    assert login_resp.status_code == 401
+
+    staff_resp = await client.post(
+        "/auth/login/staff",
+        json={"password": "wrong-password"},
+    )
+    assert staff_resp.status_code == 401
+
+    verify_resp = await client.post(
+        "/auth/verify-admin",
+        json={"password": "wrongpassword"},
+    )
+    assert verify_resp.status_code == 401
+
+    assert login_resp.json()["detail"] == "Credenciales incorrectas"
+    assert staff_resp.json()["detail"] == "Credenciales incorrectas"
+    assert verify_resp.json()["detail"] == "Credenciales incorrectas"
