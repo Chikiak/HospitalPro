@@ -32,29 +32,27 @@ class TestStaffPasswordUpdateRequest:
     """Test StaffPasswordUpdateRequest schema."""
 
     def test_staff_password_update_request_valid(self):
-        """StaffPasswordUpdateRequest accepts valid passwords."""
+        """StaffPasswordUpdateRequest accepts valid new_staff_password."""
         request = StaffPasswordUpdateRequest(
-            admin_password="adminpass123",
             new_staff_password="newstaffpass123",
         )
-        assert request.admin_password == "adminpass123"
         assert request.new_staff_password == "newstaffpass123"
-
-    def test_staff_password_update_request_rejects_short_admin_password(self):
-        """StaffPasswordUpdateRequest rejects admin_password shorter than 8."""
-        with pytest.raises(ValidationError):
-            StaffPasswordUpdateRequest(
-                admin_password="short1",
-                new_staff_password="newstaffpass123",
-            )
 
     def test_staff_password_update_request_rejects_short_new_password(self):
         """StaffPasswordUpdateRequest rejects new_staff_password shorter than 8."""
         with pytest.raises(ValidationError):
             StaffPasswordUpdateRequest(
-                admin_password="adminpass123",
                 new_staff_password="short1",
             )
+
+    def test_staff_password_update_request_ignores_extra_admin_password(self):
+        """StaffPasswordUpdateRequest ignores admin_password if sent by legacy client (Pydantic extra='ignore')."""
+        request = StaffPasswordUpdateRequest(
+            new_staff_password="newstaffpass123",
+            admin_password="should-be-ignored",
+        )
+        assert request.new_staff_password == "newstaffpass123"
+        assert not hasattr(request, "admin_password")
 
 
 class TestAdminDniRequest:
@@ -63,7 +61,6 @@ class TestAdminDniRequest:
     def test_admin_dni_request_valid_11_digits(self):
         """AdminDniRequest accepts a valid 11-digit DNI."""
         request = AdminDniRequest(
-            admin_password="adminpass123",
             dni="12345678901",
             full_name="Test User",
         )
@@ -73,7 +70,6 @@ class TestAdminDniRequest:
         """AdminDniRequest rejects DNIs that are not exactly 11 digits."""
         with pytest.raises(ValidationError):
             AdminDniRequest(
-                admin_password="adminpass123",
                 dni="12345",  # too short
             )
 
@@ -81,14 +77,12 @@ class TestAdminDniRequest:
         """AdminDniRequest rejects DNIs containing non-digit characters."""
         with pytest.raises(ValidationError):
             AdminDniRequest(
-                admin_password="adminpass123",
                 dni="1234567890a",  # contains letter
             )
 
     def test_admin_dni_request_without_full_name(self):
         """AdminDniRequest accepts DNI without optional full_name."""
         request = AdminDniRequest(
-            admin_password="adminpass123",
             dni="12345678901",
         )
         assert request.dni == "12345678901"
