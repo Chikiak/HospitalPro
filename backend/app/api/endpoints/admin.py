@@ -166,8 +166,7 @@ async def delete_category(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Delete all schedules related to a category name.
-    Requires authenticated admin user (JWT). Rate limit: 10 requests per minute.
-    No admin_password parameter required."""
+    Requires authenticated admin user (JWT). Rate limit: 10 requests per minute."""
     await db.execute(delete(CategorySchedule).where(CategorySchedule.name == name))
     await db.commit()
     return {"message": f"Category {name} and its schedules deleted successfully"}
