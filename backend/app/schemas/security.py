@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.models.category_schedule import CategoryType
 
 
@@ -26,3 +26,11 @@ class AdminDniRequest(BaseModel):
     admin_password: str = Field(..., min_length=1, description="Admin password for authorization")
     dni: str = Field(..., min_length=11, max_length=11, pattern=r"^\d{11}$")
     full_name: str | None = Field(None, max_length=255)
+
+    @field_validator("dni")
+    @classmethod
+    def validate_dni_format(cls, v: str) -> str:
+        """Valida que el DNI tenga exactamente 11 dígitos numéricos."""
+        if not v or not v.isdigit() or len(v) != 11:
+            raise ValueError("El DNI debe contener exactamente 11 dígitos numéricos")
+        return v

@@ -32,9 +32,12 @@ class AuthService:
         dni: str,
         password: str,
         full_name: str,
-        role: UserRole = UserRole.PATIENT,
     ) -> User:
-        """Create a new user with hashed password."""
+        """Create a new patient user with hashed password.
+
+        Siempre crea un usuario con rol PATIENT: el registro público no
+        permite escalar privilegios desde la capa de servicio.
+        """
         # Verify DNI is in the whitelist (unconditionally for all roles)
         is_allowed = await self.allowed_person_repo.is_dni_allowed(dni)
         if not is_allowed:
@@ -45,12 +48,11 @@ class AuthService:
             dni=dni,
             hashed_password=hashed_password,
             full_name=full_name,
-            role=role,
+            role=UserRole.PATIENT,
         )
         
-        # Mark DNI as registered (only for patients)
-        if role == UserRole.PATIENT:
-            await self.allowed_person_repo.mark_as_registered(dni)
+        # Mark DNI as registered (patients only)
+        await self.allowed_person_repo.mark_as_registered(dni)
         
         return user
     

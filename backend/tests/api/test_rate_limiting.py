@@ -166,11 +166,12 @@ async def test_register_rate_limit(client: AsyncClient, test_db: AsyncSession):
     # Reset the in-memory limiter storage so this test is isolated
     app.state.limiter._storage.reset()
 
-    # Add DNI to whitelist
+    # Add DNI to whitelist (los 5 DNIs que usaremos en el bucle)
     allowed_repo = AllowedPersonRepository(test_db)
-    await allowed_repo.bulk_create([{"dni": "55555555555"}])
+    for i in range(5):
+        await allowed_repo.bulk_create([{"dni": f"555555555{i}5"}])
 
-    # First 5 registrations should succeed (or fail with non-429 errors)
+    # First 5 registrations should succeed (201) — no se acepta 422 antes del 429
     for i in range(5):
         response = await client.post(
             "/auth/users/register",
@@ -181,7 +182,7 @@ async def test_register_rate_limit(client: AsyncClient, test_db: AsyncSession):
                 "role": "patient",
             },
         )
-        assert response.status_code in (201, 403, 409, 422), f"Request {i} failed with {response.status_code}"
+        assert response.status_code == 201, f"Request {i} expected 201, got {response.status_code}: {response.text}"
 
     # 6th request should be rate limited
     response = await client.post(
