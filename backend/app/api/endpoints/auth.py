@@ -34,7 +34,7 @@ async def login(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="DNI o contraseña incorrectos",
+            detail="Credenciales incorrectas",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -73,7 +73,7 @@ async def login_staff(
     if not secrets.compare_digest(credentials.password, current_staff_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Contraseña de staff incorrecta",
+            detail="Credenciales incorrectas",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -121,7 +121,7 @@ async def verify_admin(
     if not secrets.compare_digest(credentials.password, current_admin_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Contraseña de administrador incorrecta",
+            detail="Credenciales incorrectas",
         )
     
     return {"message": "Admin verified"}
@@ -154,7 +154,9 @@ async def update_staff_password(
 
 
 @router.post("/users/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 async def register(
+    request: Request,
     user_data: UserCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserResponse:
@@ -166,7 +168,6 @@ async def register(
             dni=user_data.dni,
             password=user_data.password,
             full_name=user_data.full_name,
-            role=user_data.role,
         )
         return UserResponse.model_validate(user)
     except ValueError as e:

@@ -57,6 +57,38 @@ class TestUserCreate:
         user = UserCreate(**data)
         assert user.role == UserRole.PATIENT
 
+    def test_user_create_rejects_short_password(self):
+        """UserCreate rejects passwords shorter than 8 characters (incluye el límite de 7)."""
+        for password in ("short1", "aaaaaaa", "1234567"):
+            data = {
+                "dni": "12345678901",
+                "password": password,
+                "full_name": "John Doe",
+            }
+            with pytest.raises(ValidationError):
+                UserCreate(**data)
+
+    def test_user_create_rejects_bad_dni(self):
+        """UserCreate rejects DNIs que no sean exactamente 11 dígitos numéricos."""
+        # Menos de 11 dígitos
+        data = {
+            "dni": "12345",
+            "password": "securepass123",
+            "full_name": "John Doe",
+        }
+        with pytest.raises(ValidationError):
+            UserCreate(**data)
+
+        # Más de 11 dígitos
+        data["dni"] = "123456789012"
+        with pytest.raises(ValidationError):
+            UserCreate(**data)
+
+        # Caracteres no numéricos
+        data["dni"] = "1234567890a"
+        with pytest.raises(ValidationError):
+            UserCreate(**data)
+
 
 class TestUserResponse:
     """Test UserResponse schema."""

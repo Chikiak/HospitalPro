@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.repositories.allowed_person_repository import AllowedPersonRepository
 
 
@@ -206,16 +206,17 @@ async def test_doctor_can_access_all_patients(client: AsyncClient, test_db: Asyn
     )
     patient_id = patient_response.json()["id"]
     
-    # Create a doctor user
-    await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "88888888888",
-            "password": "doctorpass123",
-            "full_name": "Doctor User",
-            "role": "doctor",
-        },
+    # Create a doctor user directly in DB (register always creates patient now)
+    test_db.add(
+        User(
+            dni="88888888888",
+            hashed_password="hashed",
+            full_name="Doctor User",
+            role=UserRole.DOCTOR,
+            is_active=True,
+        )
     )
+    await test_db.commit()
     
     # Create token for doctor
     token = create_access_token({"sub": "88888888888", "role": "doctor"})
@@ -303,16 +304,17 @@ async def test_patient_can_download_own_pdf(client: AsyncClient, test_db: AsyncS
 @pytest.mark.asyncio
 async def test_admin_can_access_allowed_persons_bulk(client: AsyncClient, test_db: AsyncSession):
     """Test that admins can access the allowed persons bulk endpoint."""
-    # Create an admin user
-    await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "77777777777",
-            "password": "adminpass123",
-            "full_name": "Admin User",
-            "role": "admin",
-        },
+    # Create an admin user directly in DB (register always creates patient now)
+    test_db.add(
+        User(
+            dni="77777777777",
+            hashed_password="hashed",
+            full_name="Admin User",
+            role=UserRole.ADMIN,
+            is_active=True,
+        )
     )
+    await test_db.commit()
     
     # Create token for admin
     token = create_access_token({"sub": "77777777777", "role": "admin"})

@@ -3,22 +3,24 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token
+from app.models.user import User, UserRole
 from app.repositories.allowed_person_repository import AllowedPersonRepository
 
 
 @pytest.mark.asyncio
 async def test_list_all_patients_empty(client: AsyncClient, test_db: AsyncSession):
     """Test listing patients when database is empty."""
-    # Create staff user for authentication
-    await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "99999999999",
-            "password": "staffpass123",
-            "full_name": "Staff User",
-            "role": "staff",
-        },
+    # Create staff user directly in DB (not via public registration)
+    test_db.add(
+        User(
+            dni="99999999999",
+            hashed_password="hashed",
+            full_name="Staff User",
+            role=UserRole.STAFF,
+            is_active=True,
+        )
     )
+    await test_db.commit()
     
     # Create token for staff
     token = create_access_token({"sub": "99999999999", "role": "staff"})
@@ -35,22 +37,23 @@ async def test_list_all_patients_empty(client: AsyncClient, test_db: AsyncSessio
 @pytest.mark.asyncio
 async def test_list_all_patients_with_data(client: AsyncClient, test_db: AsyncSession):
     """Test listing patients with patient data."""
-    # Create staff user for authentication
-    await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "99999999999",
-            "password": "staffpass123",
-            "full_name": "Staff User",
-            "role": "staff",
-        },
+    # Create staff user directly in DB (not via public registration)
+    test_db.add(
+        User(
+            dni="99999999999",
+            hashed_password="hashed",
+            full_name="Staff User",
+            role=UserRole.STAFF,
+            is_active=True,
+        )
     )
+    await test_db.commit()
     
     # Add patient DNI to allowed persons list
     allowed_repo = AllowedPersonRepository(test_db)
     await allowed_repo.bulk_create([{"dni": "98765432101"}])
     
-    # Create a patient user
+    # Create a patient user via public registration
     patient_response = await client.post(
         "/auth/users/register",
         json={
@@ -100,16 +103,17 @@ async def test_list_all_patients_with_data(client: AsyncClient, test_db: AsyncSe
 @pytest.mark.asyncio
 async def test_list_patients_excludes_non_patients(client: AsyncClient, test_db: AsyncSession):
     """Test that listing patients only returns users with patient role."""
-    # Create staff user for authentication
-    await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "99999999999",
-            "password": "staffpass123",
-            "full_name": "Staff User",
-            "role": "staff",
-        },
+    # Create staff user directly in DB (not via public registration)
+    test_db.add(
+        User(
+            dni="99999999999",
+            hashed_password="hashed",
+            full_name="Staff User",
+            role=UserRole.STAFF,
+            is_active=True,
+        )
     )
+    await test_db.commit()
     
     # Create a patient
     allowed_repo = AllowedPersonRepository(test_db)
@@ -125,16 +129,17 @@ async def test_list_patients_excludes_non_patients(client: AsyncClient, test_db:
         },
     )
     
-    # Create a doctor (non-patient role)
-    await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "22222222222",
-            "password": "testpassword123",
-            "full_name": "Doctor User",
-            "role": "doctor",
-        },
+    # Create a doctor directly in DB (not via public registration)
+    test_db.add(
+        User(
+            dni="22222222222",
+            hashed_password="hashed",
+            full_name="Doctor User",
+            role=UserRole.DOCTOR,
+            is_active=True,
+        )
     )
+    await test_db.commit()
     
     # Create token for staff
     token = create_access_token({"sub": "99999999999", "role": "staff"})
@@ -155,16 +160,17 @@ async def test_list_patients_excludes_non_patients(client: AsyncClient, test_db:
 @pytest.mark.asyncio
 async def test_list_patients_without_medical_history(client: AsyncClient, test_db: AsyncSession):
     """Test listing patients who haven't filled medical history yet."""
-    # Create staff user for authentication
-    await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "99999999999",
-            "password": "staffpass123",
-            "full_name": "Staff User",
-            "role": "staff",
-        },
+    # Create staff user directly in DB (not via public registration)
+    test_db.add(
+        User(
+            dni="99999999999",
+            hashed_password="hashed",
+            full_name="Staff User",
+            role=UserRole.STAFF,
+            is_active=True,
+        )
     )
+    await test_db.commit()
     
     # Create a patient without medical history
     allowed_repo = AllowedPersonRepository(test_db)
