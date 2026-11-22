@@ -104,26 +104,37 @@ def test_admin_dni_request_requires_11_digits():
     )
     assert request.dni == "12345678901"
 
-    # Menos de 11 dígitos
-    with pytest.raises(ValidationError):
+    # Menos de 11 dígitos: mensaje en español
+    with pytest.raises(ValidationError) as exc_info:
         AdminDniRequest(
             admin_password="adminpass123",
             dni="1234567890",  # 10 dígitos
         )
+    assert "11 dígitos numéricos" in str(exc_info.value)
 
-    # Más de 11 dígitos
-    with pytest.raises(ValidationError):
+    # Más de 11 dígitos: mensaje en español
+    with pytest.raises(ValidationError) as exc_info:
         AdminDniRequest(
             admin_password="adminpass123",
             dni="123456789012",  # 12 dígitos
         )
+    assert "11 dígitos numéricos" in str(exc_info.value)
 
-    # Caracteres no numéricos
-    with pytest.raises(ValidationError):
+    # Caracteres no numéricos: mensaje en español
+    with pytest.raises(ValidationError) as exc_info:
         AdminDniRequest(
             admin_password="adminpass123",
             dni="1234567890a",  # contiene letra
         )
+    assert "11 dígitos numéricos" in str(exc_info.value)
+
+    # Valor no string: mensaje en español
+    with pytest.raises(ValidationError) as exc_info:
+        AdminDniRequest(
+            admin_password="adminpass123",
+            dni=12345678901,  # int en vez de str
+        )
+    assert "11 dígitos numéricos" in str(exc_info.value)
 
 
 def test_admin_password_min_length():
