@@ -7,9 +7,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.deps import get_current_user, require_role
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.core.rate_limit import limiter
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, StaffLoginRequest, Token
 from app.schemas.user import UserCreate, UserResponse
 from app.services.auth_service import AuthService
@@ -115,11 +116,15 @@ async def login_staff(
 from app.schemas.security import AdminVerifyRequest, StaffPasswordUpdateRequest
 
 @router.post("/verify-admin", status_code=status.HTTP_200_OK)
+@limiter.limit("3/min")
 async def verify_admin(
+    request: Request,
     credentials: AdminVerifyRequest,
+    current_user: Annotated[User, Depends(require_role(["admin"]))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Verify admin password for sensitive operations."""
+    """Verify admin password for sensitive operations.
+    Requires authenticated admin user (JWT). Rate limit: 3 requests per minute."""
     from sqlalchemy import select
     from app.models.system_config import SystemConfig
     
@@ -154,27 +159,28 @@ async def verify_admin(
 
 
 @router.post("/update-staff-password", status_code=status.HTTP_200_OK)
+@limiter.limit("3/min")
 async def update_staff_password(
-    request: StaffPasswordUpdateRequest,
+    request: Request,
+    request_data: StaffPasswordUpdateRequest,
+    current_user: Annotated[User, Depends(require_role(["admin"]))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Update the staff password (requires admin authorization)."""
-    # 1. Verify admin password
-    await verify_admin(AdminVerifyRequest(password=request.admin_password), db)
-    
+    """Update the staff password (requires admin authorization via JWT).
+    Rate limit: 3 requests per minute."""
     # 2. Update staff password in database
     from sqlalchemy import select
     from app.models.system_config import SystemConfig
-    
+
     result = await db.execute(select(SystemConfig).where(SystemConfig.key == "staff_password"))
     config = result.scalar_one_or_none()
-    
+
     if config:
-        config.value = get_password_hash(request.new_staff_password)
+        config.value = get_password_hash(request_data.new_staff_password)
     else:
-        config = SystemConfig(key="staff_password", value=get_password_hash(request.new_staff_password))
+        config = SystemConfig(key="staff_password", value=get_password_hash(request_data.new_staff_password))
         db.add(config)
-    
+
     await db.commit()
     return {"message": "Staff password updated successfully"}
 
