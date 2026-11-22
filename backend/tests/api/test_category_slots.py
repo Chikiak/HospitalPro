@@ -1,5 +1,5 @@
 import pytest
-from datetime import time
+from datetime import datetime, time
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,7 +41,10 @@ async def test_get_slots_without_date_param(client: AsyncClient, test_db: AsyncS
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data) <= 3
+    # Hay 2 horarios FIXED configurados (lunes y miércoles): al menos 1 slot por día, tope 3
+    assert 2 <= len(data) <= 3, f"se esperaban 2-3 slots, se devolvieron {len(data)}"
+    for slot in data:
+        datetime.fromisoformat(slot["slot_datetime"])  # debe ser un ISO string válido
 
     # Cada slot debe caer en un día distinto
     days = {d["slot_datetime"][:10] for d in data}

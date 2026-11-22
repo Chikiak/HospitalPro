@@ -239,10 +239,11 @@ async def test_list_schedules_with_data(client: AsyncClient, test_db: AsyncSessi
 
 @pytest.mark.asyncio
 async def test_create_schedule_invalid_day_of_week(client: AsyncClient):
-    """Test creating schedule with invalid day_of_week."""
+    """Test creating schedule with invalid day_of_week: 422 por day_of_week, no por admin_password."""
     response = await client.post(
         "/admin/schedules",
         json={
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "specialty",
             "name": "Cardiology",
             "day_of_week": 7,  # Invalid (should be 0-6)
@@ -255,14 +256,17 @@ async def test_create_schedule_invalid_day_of_week(client: AsyncClient):
     )
     
     assert response.status_code == 422  # Validation error
+    detail = str(response.json()["detail"])
+    assert "day_of_week" in detail, f"se esperaba error en day_of_week, detalle: {detail}"
 
 
 @pytest.mark.asyncio
 async def test_create_schedule_invalid_turn_duration(client: AsyncClient):
-    """Test creating schedule with invalid turn_duration."""
+    """Test creating schedule with invalid turn_duration: 422 por turn_duration, no por admin_password."""
     response = await client.post(
         "/admin/schedules",
         json={
+            "admin_password": ADMIN_PASSWORD,
             "category_type": "specialty",
             "name": "Cardiology",
             "day_of_week": 0,
@@ -275,6 +279,8 @@ async def test_create_schedule_invalid_turn_duration(client: AsyncClient):
     )
     
     assert response.status_code == 422  # Validation error
+    detail = str(response.json()["detail"])
+    assert "turn_duration" in detail, f"se esperaba error en turn_duration, detalle: {detail}"
 
 
 @pytest.mark.asyncio
@@ -295,6 +301,8 @@ async def test_create_schedule_without_admin_password(client: AsyncClient):
     )
     
     assert response.status_code == 422  # Missing required admin_password
+    detail = str(response.json()["detail"])
+    assert "admin_password" in detail, f"se esperaba error en admin_password, detalle: {detail}"
 
 
 @pytest.mark.asyncio

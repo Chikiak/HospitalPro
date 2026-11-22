@@ -6,12 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.category_schedule import CategorySchedule, CategoryType, RotationType
 from app.models.user import User, UserRole
-from app.models.appointment import AppointmentStatus
 
 
 @pytest.mark.asyncio
 async def test_get_slots_by_category(client: AsyncClient, test_db: AsyncSession):
-    """GET /appointments/slots con category_name y category_type: 200, <=3 slots, días distintos."""
+    """GET /appointments/slots con category_name y category_type: 200, entre 1 y 3 slots, días distintos."""
     test_db.add(
         CategorySchedule(
             category_type=CategoryType.SPECIALTY,
@@ -32,9 +31,12 @@ async def test_get_slots_by_category(client: AsyncClient, test_db: AsyncSession)
 
     assert response.status_code == 200
     data = response.json()
-    assert len(data) <= 3
+    assert 1 <= len(data) <= 3, f"se esperaban 1-3 slots, se devolvieron {len(data)}"
+    for slot in data:
+        assert slot["slot_datetime"], "slot_datetime no debe estar vacío"
+        assert slot["category_name"] == "Cardiologia"
     days = {d["slot_datetime"][:10] for d in data}
-    assert len(days) == len(data)
+    assert len(days) == len(data), "los slots deben caer en días distintos"
 
 
 @pytest.mark.asyncio

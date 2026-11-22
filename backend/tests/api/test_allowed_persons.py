@@ -91,23 +91,34 @@ async def test_bulk_create_allowed_persons_without_token(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "role,role_enum",
+    [
+        ("admin", UserRole.ADMIN),
+        ("staff", UserRole.STAFF),
+    ],
+)
 async def test_bulk_create_allowed_persons_with_admin_token(
-    client: AsyncClient, test_db: AsyncSession, make_token
+    client: AsyncClient,
+    test_db: AsyncSession,
+    make_token,
+    role: str,
+    role_enum: UserRole,
 ):
-    """POST /patients/allowed-persons/bulk con token rol admin: 201 con count == 3."""
-    dni = "ADMIN001"
+    """POST /patients/allowed-persons/bulk con token rol admin o staff: 201 con count == 3 (AC4)."""
+    dni = f"ADMIN{role.upper()}001"
     test_db.add(
         User(
             dni=dni,
             hashed_password="hashed",
-            full_name="Admin User",
-            role=UserRole.ADMIN,
+            full_name=f"{role.title()} User",
+            role=role_enum,
             is_active=True,
         )
     )
     await test_db.commit()
 
-    token = make_token(dni=dni, role="admin")
+    token = make_token(dni=dni, role=role)
     response = await client.post(
         "/patients/allowed-persons/bulk",
         json={
