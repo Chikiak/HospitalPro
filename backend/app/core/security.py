@@ -1,3 +1,9 @@
+"""Security helpers: password hashing (bcrypt) and JWT access tokens.
+
+JWT: PyJWT is the unique JWT library; tokens are JWS signed with the
+explicit algorithm from settings (HS256). Hashing uses bcrypt directly
+(no passlib). Public functions keep their names and semantics.
+"""
 from datetime import datetime, timedelta, UTC
 from typing import Optional
 
