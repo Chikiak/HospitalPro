@@ -8,7 +8,6 @@ from app.models.category_schedule import CategoryType, RotationType
 
 class CategoryScheduleCreate(BaseModel):
     """Schema for creating a category schedule."""
-    admin_password: str = Field(..., min_length=1, description="Admin password for authorization")
     category_type: CategoryType = Field(..., description="Type of category (specialty or laboratory)")
     name: str = Field(..., max_length=100, description="Name of the specialty or laboratory")
 
