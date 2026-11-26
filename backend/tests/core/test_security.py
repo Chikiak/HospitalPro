@@ -5,8 +5,9 @@ una vez con las librerías anteriores (python-jose y passlib/bcrypt 3.2.2) y se
 embeben como constantes para verificar que decode_access_token / verify_password
 siguen aceptando tokens y hashes creados con la librería antigua.
 """
-import pytest
+from datetime import timedelta
 
+from app.core.config import settings
 from app.core.security import (
     create_access_token,
     decode_access_token,
@@ -38,9 +39,6 @@ def test_token_roundtrip():
 
 def test_decode_invalid_token_returns_none():
     assert decode_access_token("not.a.token") is None
-    wrong_secret_token = create_access_token({"sub": "1"}, expires_delta=None)
-    # Firmado con la clave correcta pero el test de "clave equivocada" se hace
-    # construyendo un token con otra clave directamente.
     import jwt
 
     other = jwt.encode(
@@ -51,12 +49,18 @@ def test_decode_invalid_token_returns_none():
     assert decode_access_token(other) is None
 
 
-def test_legacy_token_still_decodes():
+def test_legacy_token_still_decodes(monkeypatch):
+    monkeypatch.setattr(settings, "SECRET_KEY", "test-secret-key-do-not-use-in-production")
     payload = decode_access_token(LEGACY_JOSE_TOKEN)
     assert payload is not None
     assert payload["sub"] == "12345678"
     assert payload["role"] == "admin"
     assert "exp" in payload
+
+
+def test_decode_expired_token_returns_none():
+    token = create_access_token({"sub": "1"}, expires_delta=timedelta(seconds=-10))
+    assert decode_access_token(token) is None
 
 
 def test_password_hash_and_verify():

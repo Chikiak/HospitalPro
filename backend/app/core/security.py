@@ -4,8 +4,7 @@ JWT: PyJWT is the unique JWT library; tokens are JWS signed with the
 explicit algorithm from settings (HS256). Hashing uses bcrypt directly
 (no passlib). Public functions keep their names and semantics.
 """
-from datetime import datetime, timedelta, UTC
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
@@ -19,7 +18,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return bcrypt.checkpw(
             plain_password.encode("utf-8"), hashed_password.encode("utf-8")
         )
-    except Exception:
+    except Exception:  # noqa: BLE001  # verify_password nunca propaga; retorna False
         return False
 
 
@@ -28,7 +27,7 @@ def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token (JWS HS256)."""
     to_encode = data.copy()
     if expires_delta:
@@ -41,7 +40,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-def decode_access_token(token: str) -> Optional[dict]:
+def decode_access_token(token: str) -> dict | None:
     """Decode a JWT access token, returning None on any error."""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
