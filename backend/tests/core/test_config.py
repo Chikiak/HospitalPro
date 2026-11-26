@@ -29,21 +29,57 @@ def test_settings_requires_secrets(monkeypatch):
     assert {"SECRET_KEY", "ADMIN_PASSWORD", "STAFF_PASSWORD"} <= missing
 
 
-def test_settings_defaults_correct():
+def test_settings_defaults_correct(monkeypatch):
     """AC4/AC6: con entorno de pruebas, SQL_ECHO desactivado y ALLOWED_ORIGINS por defecto."""
-    settings = Settings()
+    monkeypatch.delenv("SQL_ECHO", raising=False)
+    monkeypatch.delenv("ALLOWED_ORIGINS", raising=False)
+    settings = _SettingsNoEnvFile()
     assert settings.SQL_ECHO is False
     assert settings.ALLOWED_ORIGINS == "http://localhost:5173"
 
 
-def test_database_echo_defaults_false():
+def test_database_echo_defaults_false(monkeypatch):
     """AC4: sin variable SQL_ECHO, el motor no hace echo."""
-    settings = Settings()
+    monkeypatch.delenv("SQL_ECHO", raising=False)
+    monkeypatch.delenv("ALLOWED_ORIGINS", raising=False)
+    settings = _SettingsNoEnvFile()
     assert settings.SQL_ECHO is False
 
 
 def test_database_echo_can_be_enabled(monkeypatch):
     """AC4: con SQL_ECHO=true, el motor hace echo."""
     monkeypatch.setenv("SQL_ECHO", "true")
-    settings = Settings()
+    settings = _SettingsNoEnvFile()
     assert settings.SQL_ECHO is True
+
+
+def test_engine_echo_defaults_false(monkeypatch):
+    """Por defecto, app.core.database.engine no hace echo (SQL_ECHO falso/ausente)."""
+    monkeypatch.delenv("SQL_ECHO", raising=False)
+    import importlib
+
+    import app.core.database as database_module
+
+    importlib.reload(database_module)
+    try:
+        assert database_module.engine.echo is False
+    finally:
+        importlib.reload(database_module)
+
+
+def test_engine_echo_can_be_enabled(monkeypatch):
+    """Con SQL_ECHO=true, al (re)construir el motor, app.core.database.engine hace echo."""
+    monkeypatch.setenv("SQL_ECHO", "true")
+    import importlib
+
+    import app.core.config as config_module
+    import app.core.database as database_module
+
+    importlib.reload(config_module)
+    importlib.reload(database_module)
+    try:
+        assert database_module.engine.echo is True
+    finally:
+        monkeypatch.delenv("SQL_ECHO", raising=False)
+        importlib.reload(config_module)
+        importlib.reload(database_module)

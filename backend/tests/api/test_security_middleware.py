@@ -158,3 +158,30 @@ async def test_cors_methods_are_explicit(client: AsyncClient):
     assert "*" not in methods
     assert "DELETE" in methods
 
+
+@pytest.mark.asyncio
+async def test_cors_parses_multiple_origins_with_spaces(monkeypatch):
+    """ALLOWED_ORIGINS acepta varios orígenes separados por coma con espacios."""
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://a.example, https://b.example")
+    import importlib
+
+    import app.core.config as config_module
+    import app.main as main_module
+
+    importlib.reload(config_module)
+    importlib.reload(main_module)
+    try:
+        from fastapi.middleware.cors import CORSMiddleware
+
+        cors_entry = next(
+            m for m in main_module.app.user_middleware if m.cls is CORSMiddleware
+        )
+        allow_origins = cors_entry.kwargs["allow_origins"]
+        assert "https://a.example" in allow_origins
+        assert "https://b.example" in allow_origins
+        assert len(allow_origins) == 2
+    finally:
+        monkeypatch.delenv("ALLOWED_ORIGINS", raising=False)
+        importlib.reload(config_module)
+        importlib.reload(main_module)
+
