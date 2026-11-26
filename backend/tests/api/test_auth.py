@@ -506,18 +506,20 @@ async def test_staff_login_missing_staff_password_returns_503(client: AsyncClien
 
 
 @pytest.mark.asyncio
-async def test_verify_admin_missing_admin_password_returns_503(client: AsyncClient, test_db: AsyncSession):
+@pytest.mark.asyncio
+async def test_verify_admin_missing_admin_password_returns_503(client: AsyncClient, test_db: AsyncSession, admin_headers: dict):
     """POST /auth/verify-admin sin admin_password en system_config -> 503."""
     response = await client.post(
         "/auth/verify-admin",
         json={"password": "whatever"},
+        headers=admin_headers,
     )
     assert response.status_code == 503
     assert "Admin authentication is not configured" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_verify_admin_plaintext_admin_password_returns_503(client: AsyncClient, test_db: AsyncSession):
+async def test_verify_admin_plaintext_admin_password_returns_503(client: AsyncClient, test_db: AsyncSession, admin_headers: dict):
     """POST /auth/verify-admin con admin_password en texto plano -> 503."""
     test_db.add(SystemConfig(key="admin_password", value="valor-en-texto-plano"))
     await test_db.commit()
@@ -525,6 +527,7 @@ async def test_verify_admin_plaintext_admin_password_returns_503(client: AsyncCl
     response = await client.post(
         "/auth/verify-admin",
         json={"password": "valor-en-texto-plano"},
+        headers=admin_headers,
     )
     assert response.status_code == 503
     assert "hash_config_passwords.py" in response.json()["detail"]

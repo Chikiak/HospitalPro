@@ -129,7 +129,7 @@ def test_admin_dni_request_requires_11_digits():
 
 
 def test_admin_password_min_length():
-    """AdminVerifyRequest (password) y StaffPasswordUpdateRequest (admin_password y new_staff_password) rechazan <8 y aceptan 8."""
+    """AdminVerifyRequest (password) y StaffPasswordUpdateRequest (new_staff_password) rechazan <8 y aceptan 8."""
     # AdminVerifyRequest acepta 8 caracteres
     req = AdminVerifyRequest(password="aaaaaaaa")
     assert req.password == "aaaaaaaa"
@@ -142,24 +142,14 @@ def test_admin_password_min_length():
     with pytest.raises(ValidationError):
         AdminVerifyRequest(password="short1")
 
-    # StaffPasswordUpdateRequest acepta 8 caracteres en ambos campos
+    # StaffPasswordUpdateRequest acepta 8 caracteres en new_staff_password
     req = StaffPasswordUpdateRequest(
-        admin_password="adminpass",
         new_staff_password="newstaff",
     )
-    assert req.admin_password == "adminpass"
     assert req.new_staff_password == "newstaff"
-
-    # StaffPasswordUpdateRequest rechaza admin_password de 7 caracteres
-    with pytest.raises(ValidationError):
-        StaffPasswordUpdateRequest(
-            admin_password="adminp",  # 7 caracteres
-            new_staff_password="newstaff",
-        )
 
     # StaffPasswordUpdateRequest rechaza new_staff_password de 7 caracteres
     with pytest.raises(ValidationError):
         StaffPasswordUpdateRequest(
-            admin_password="adminpass",
             new_staff_password="newstaf",  # 7 caracteres
         )
