@@ -57,6 +57,48 @@ Estos 5 fallos están fuera del alcance de `F1-01` (no se modifica nada en `back
 ## Notas
 
 - No se requieren credenciales reales ni una base de datos PostgreSQL para correr los tests.
+
+## Scripts de seguridad (F1-06)
+
+### `backend/scripts/hash_config_passwords.py`
+
+Convierte valores en texto plano de `system_config` (claves `staff_password` y `admin_password`) a hash bcrypt. Es idempotente: ejecutarlo varias veces no re-hashea valores ya convertidos.
+
+```powershell
+# Ejecutar con credenciales de entorno
+$env:STAFF_PASSWORD="mi-password-staff"
+$env:ADMIN_PASSWORD="mi-password-admin"
+python backend/scripts/hash_config_passwords.py
+```
+
+Salida esperada:
+- `Convertido: staff_password` — se guardó el hash
+- `Ya hasheado: admin_password` — ya tenía hash, no se tocó
+- `Nada que convertir` — si no se definieron variables de entorno
+
+No se importa en `main.py` ni se ejecuta en el arranque: la conversión es siempre un paso explícito de despliegue.
+
+### `backend/scripts/create_admin.py`
+
+Crea el usuario administrador inicial desde variables de entorno `ADMIN_DNI` y `ADMIN_PASSWORD` (mínimo 8 caracteres). Es idempotente: ejecutarlo dos veces no crea duplicados. Si el DNI ya existe con otro rol, falla con mensaje claro.
+
+Opcionalmente crea un usuario staff con `STAFF_DNI` y `STAFF_PASSWORD`.
+
+```powershell
+$env:ADMIN_DNI="12345678901"
+$env:ADMIN_PASSWORD="AdminPass1234"
+$env:STAFF_DNI="11111111111"
+$env:STAFF_PASSWORD="StaffPass1234"
+python backend/scripts/create_admin.py
+```
+
+Salida esperada:
+- `Creado administrador: dni=12345678901`
+- `Creado staff: dni=11111111111`
+- En segunda ejecución: no imprime nada de creación (idempotente)
+
+No se importa en `main.py` ni se ejecuta en el arranque: el bootstrap es siempre un paso explícito de despliegue.
+
 ## Entorno de desarrollo · Frontend
 
 Desde la raíz del repositorio:

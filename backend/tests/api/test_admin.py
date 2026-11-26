@@ -1,15 +1,25 @@
 import pytest
+import pytest_asyncio
 from datetime import time
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import get_password_hash
 from app.models.category_schedule import CategorySchedule, CategoryType, RotationType
+from app.models.system_config import SystemConfig
 
 # Contraseña de admin de prueba: se lee de la configuración (coherente con
 # conftest.py) para no fallar si existe un .env local con otro valor.
 from app.core.config import settings
 
 ADMIN_PASSWORD = settings.ADMIN_PASSWORD
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def seed_admin_password(test_db: AsyncSession):
+    """Sembrar admin_password hasheado en system_config para los tests de admin."""
+    test_db.add(SystemConfig(key="admin_password", value=get_password_hash(ADMIN_PASSWORD)))
+    await test_db.commit()
 
 
 @pytest.mark.asyncio
