@@ -5,7 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.category_schedule import CategorySchedule, CategoryType, RotationType
 
-ADMIN_PASSWORD = "admin1234"
+# Contraseña de admin de prueba: se lee de la configuración (coherente con
+# conftest.py) para no fallar si existe un .env local con otro valor.
+from app.core.config import settings
+
+ADMIN_PASSWORD = settings.ADMIN_PASSWORD
 
 
 @pytest.mark.asyncio

@@ -12,6 +12,7 @@ from app.api.endpoints import admin
 from app.api.endpoints import auth
 from app.api.endpoints import appointments
 from app.api.endpoints import patients
+from app.core.config import settings
 from app.core.database import init_db
 from app.core.rate_limit import limiter
 
@@ -65,16 +66,20 @@ app.add_middleware(
 )
 
 # Configure CORS
-origins = [
-    "http://localhost:5173",  # Vite default
-    "http://localhost:3000",
+# Orígenes desde ALLOWED_ORIGINS (lista separada por comas) con default de
+# desarrollo http://localhost:5173. Métodos restringidos a los que usa la API
+# en lugar de comodín (F1-05).
+allowed_origins = [
+    origin.strip()
+    for origin in settings.ALLOWED_ORIGINS.split(",")
+    if origin.strip()
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

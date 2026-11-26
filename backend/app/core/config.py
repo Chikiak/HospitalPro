@@ -14,12 +14,16 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     
-    # Security - Must be set via environment variable
+    # Security - Must be set via environment variable (no insecure defaults)
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    STAFF_PASSWORD: str = ""  # Must be set for staff authentication to work
-    ADMIN_PASSWORD: str = "admin1234"  # Default admin password for sensitive operations
+    STAFF_PASSWORD: str  # Obligatorio: sin valor por defecto (F1-05)
+    ADMIN_PASSWORD: str  # Obligatorio: sin valor por defecto (F1-05)
+    
+    # Runtime - configurables por entorno con defaults seguros (F1-05)
+    SQL_ECHO: bool = False
+    ALLOWED_ORIGINS: str = "http://localhost:5173"
     
     @property
     def DATABASE_URL(self) -> str:

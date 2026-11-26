@@ -9,7 +9,7 @@ from app.core.config import settings
 # Create async engine
 engine: AsyncEngine = create_async_engine(
     settings.DATABASE_URL,
-    echo=True,
+    echo=settings.SQL_ECHO,
     future=True,
 )
 
