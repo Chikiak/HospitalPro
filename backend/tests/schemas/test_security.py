@@ -68,17 +68,19 @@ class TestAdminDniRequest:
 
     def test_admin_dni_request_rejects_non_11_digit_dni(self):
         """AdminDniRequest rejects DNIs that are not exactly 11 digits."""
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as exc_info:
             AdminDniRequest(
                 dni="12345",  # too short
             )
+        assert "El DNI debe contener exactamente 11 dígitos numéricos" in str(exc_info.value)
 
     def test_admin_dni_request_rejects_non_numeric_dni(self):
         """AdminDniRequest rejects DNIs containing non-digit characters."""
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as exc_info:
             AdminDniRequest(
                 dni="1234567890a",  # contains letter
             )
+        assert "El DNI debe contener exactamente 11 dígitos numéricos" in str(exc_info.value)
 
     def test_admin_dni_request_without_full_name(self):
         """AdminDniRequest accepts DNI without optional full_name."""
@@ -93,7 +95,6 @@ def test_admin_dni_request_requires_11_digits():
     """AdminDniRequest acepta DNI de 11 dígitos numéricos y rechaza <11, >11 y no numéricos."""
     # 11 dígitos válidos
     request = AdminDniRequest(
-        admin_password="adminpass123",
         dni="12345678901",
     )
     assert request.dni == "12345678901"
@@ -101,34 +102,30 @@ def test_admin_dni_request_requires_11_digits():
     # Menos de 11 dígitos: mensaje en español
     with pytest.raises(ValidationError) as exc_info:
         AdminDniRequest(
-            admin_password="adminpass123",
             dni="1234567890",  # 10 dígitos
         )
-    assert "11 dígitos numéricos" in str(exc_info.value)
+    assert "El DNI debe contener exactamente 11 dígitos numéricos" in str(exc_info.value)
 
     # Más de 11 dígitos: mensaje en español
     with pytest.raises(ValidationError) as exc_info:
         AdminDniRequest(
-            admin_password="adminpass123",
             dni="123456789012",  # 12 dígitos
         )
-    assert "11 dígitos numéricos" in str(exc_info.value)
+    assert "El DNI debe contener exactamente 11 dígitos numéricos" in str(exc_info.value)
 
     # Caracteres no numéricos: mensaje en español
     with pytest.raises(ValidationError) as exc_info:
         AdminDniRequest(
-            admin_password="adminpass123",
             dni="1234567890a",  # contiene letra
         )
-    assert "11 dígitos numéricos" in str(exc_info.value)
+    assert "El DNI debe contener exactamente 11 dígitos numéricos" in str(exc_info.value)
 
     # Valor no string: mensaje en español
     with pytest.raises(ValidationError) as exc_info:
         AdminDniRequest(
-            admin_password="adminpass123",
             dni=12345678901,  # int en vez de str
         )
-    assert "11 dígitos numéricos" in str(exc_info.value)
+    assert "El DNI debe contener exactamente 11 dígitos numéricos" in str(exc_info.value)
 
 
 def test_admin_password_min_length():
