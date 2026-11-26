@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_password_hash, verify_password
 from app.models.system_config import SystemConfig
@@ -316,7 +317,7 @@ async def test_update_staff_password_stores_hash(client: AsyncClient, test_db: A
     assert response.json()["message"] == "Staff password updated successfully"
 
     result = await test_db.execute(
-        __import__("sqlalchemy").select(SystemConfig).where(SystemConfig.key == "staff_password")
+        select(SystemConfig).where(SystemConfig.key == "staff_password")
     )
     stored = result.scalar_one_or_none()
     assert stored is not None
@@ -371,3 +372,39 @@ async def test_auth_error_messages_are_uniform_with_hashes(client: AsyncClient, 
     assert login_resp.json()["detail"] == "Credenciales incorrectas"
     assert staff_resp.json()["detail"] == "Credenciales incorrectas"
     assert verify_resp.json()["detail"] == "Credenciales incorrectas"
+
+
+@pytest.mark.asyncio
+async def test_staff_login_missing_staff_password_returns_503(client: AsyncClient, test_db: AsyncSession):
+    """POST /auth/login/staff sin staff_password en system_config -> 503."""
+    response = await client.post(
+        "/auth/login/staff",
+        json={"password": "whatever"},
+    )
+    assert response.status_code == 503
+    assert "Staff authentication is not configured" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_verify_admin_missing_admin_password_returns_503(client: AsyncClient, test_db: AsyncSession):
+    """POST /auth/verify-admin sin admin_password en system_config -> 503."""
+    response = await client.post(
+        "/auth/verify-admin",
+        json={"password": "whatever"},
+    )
+    assert response.status_code == 503
+    assert "Admin authentication is not configured" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_verify_admin_plaintext_admin_password_returns_503(client: AsyncClient, test_db: AsyncSession):
+    """POST /auth/verify-admin con admin_password en texto plano -> 503."""
+    test_db.add(SystemConfig(key="admin_password", value="valor-en-texto-plano"))
+    await test_db.commit()
+
+    response = await client.post(
+        "/auth/verify-admin",
+        json={"password": "valor-en-texto-plano"},
+    )
+    assert response.status_code == 503
+    assert "hash_config_passwords.py" in response.json()["detail"]

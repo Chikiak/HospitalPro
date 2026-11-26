@@ -13,10 +13,12 @@ siempre un paso explícito de despliegue (script CLI).
 
 import os
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import select
 
-from app.core.database import get_db
 from app.core.security import get_password_hash
 from app.models.system_config import SystemConfig
 
@@ -65,12 +67,13 @@ async def main() -> int:
         print("Nada que convertir: no se definieron STAFF_PASSWORD ni ADMIN_PASSWORD")
         return 0
 
-    async for session in get_db():
+    from app.core.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as session:
         if staff_password:
             await convert_key(session, "staff_password", staff_password)
         if admin_password:
             await convert_key(session, "admin_password", admin_password)
-        break
 
     return 0
 

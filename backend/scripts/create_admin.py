@@ -12,6 +12,9 @@ un paso explícito de despliegue (script CLI).
 
 import os
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
