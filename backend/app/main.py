@@ -1,8 +1,11 @@
 from contextlib import asynccontextmanager
 import os
 
-from fastapi import FastAPI, Request, Response
+import logging
+
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -15,6 +18,9 @@ from app.api.endpoints import patients
 from app.core.config import settings
 from app.core.database import init_db
 from app.core.rate_limit import limiter
+from app.exceptions import ServiceUnavailable
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -96,3 +102,36 @@ app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(appointments.router)
 app.include_router(patients.router)
+
+
+# ---------------------------------------------------------------------------
+# Generic server-error middleware (F2-06).
+# Catches every exception that bubbles up from an endpoint and answers with a
+# generic message, never interpolating str(e), stack, SQL, DSN or credentials
+# into the client-facing response. Diagnostics are recorded server-side with
+# logger.exception. HTTPException (functional 4xx/4xx errors) is re-raised so
+# it keeps its status and detail; it is never turned into a 500.
+#
+# Note: @app.exception_handler(Exception) does not apply through Starlette's
+# HTTP stack in this FastAPI/Starlette version (handlers are read from the
+# ASGI scope, not from app.exception_handlers), so a middleware is used.
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def generic_server_error_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except ServiceUnavailable:
+        logger.exception("External service unavailable")
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Servicio temporalmente no disponible"},
+        )
+    except HTTPException:
+        # Functional client errors (4xx): propagate as-is, never convert to 500.
+        raise
+    except Exception:
+        logger.exception("Unhandled server error")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Error interno del servidor"},
+        )

@@ -101,23 +101,19 @@ async def update_medical_history(
                     patient_id=patient_id,
                     registration_survey=medical_history
                 )
-            except Exception as e:
+            except Exception:
                 # If medical record creation fails (e.g. concurrent request or data error),
-                # we MUST rollback to prevent PendingRollbackError in the rest of the request
+                # we MUST rollback to prevent PendingRollbackError in the rest of the request.
+                # The failure is logged server-side (diagnostic only) and does not surface to
+                # the client; triage data was already saved by its own repo commit.
                 await db.rollback()
-                logger.error(f"Failed to create medical record for patient {patient_id}: {e}")
+                logger.error("Failed to create medical record for patient %s", patient_id)
                 # We continue since triage data was already saved successfully by its own repo commit
         
         return TriageDataResponse.model_validate(triage_data)
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.exception(f"Unexpected error in update_medical_history for patient {patient_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error interno al guardar la información médica: {str(e)}"
-        )
 
 
 @router.get("/{patient_id}/medical-history", response_model=TriageDataResponse)

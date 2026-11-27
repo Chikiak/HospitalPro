@@ -87,9 +87,12 @@ class OracleAdapter:
                     return self._row_to_patient_history(row, cursor.description)
                     
         except oracledb.Error as e:
-            # Convert Oracle-specific errors to generic ServiceUnavailable
+            # Convert Oracle-specific errors to generic ServiceUnavailable without
+            # leaking the driver error (which may contain DSN/credentials) to the
+            # client. The diagnostic is recorded server-side by the exception
+            # handler in app.main (logger.exception).
             raise ServiceUnavailable(
-                f"Failed to connect to Oracle database: {str(e)}"
+                "No se pudo conectar al servicio de historial de pacientes"
             ) from e
     
     def _row_to_patient_history(
