@@ -200,7 +200,6 @@ async def register(
             dni=user_data.dni,
             password=user_data.password,
             full_name=user_data.full_name,
-            role=user_data.role,
         )
         return UserResponse.model_validate(user)
     except ValueError as e:

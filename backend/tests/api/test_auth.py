@@ -229,8 +229,8 @@ async def test_staff_login_wrong_password(client: AsyncClient, test_db: AsyncSes
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("role", ["admin", "doctor", "staff"])
-async def test_register_respects_client_role(client: AsyncClient, test_db: AsyncSession, role: str):
-    """Registration respects the client-supplied role (whitelist controls access)."""
+async def test_register_ignores_client_role(client: AsyncClient, test_db: AsyncSession, role: str):
+    """Registration ignores client-supplied role; always creates patient."""
     allowed_repo = AllowedPersonRepository(test_db)
     await allowed_repo.bulk_create([{"dni": "12345678901"}])
 
@@ -246,11 +246,11 @@ async def test_register_respects_client_role(client: AsyncClient, test_db: Async
 
     assert response.status_code == 201
     data = response.json()
-    assert data["role"] == role
+    assert data["role"] == "patient"
 
     result = await test_db.get(User, data["id"])
     assert result is not None
-    assert result.role == role
+    assert result.role == UserRole.PATIENT
 
 
 @pytest.mark.asyncio

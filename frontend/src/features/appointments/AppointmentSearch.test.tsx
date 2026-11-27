@@ -148,10 +148,10 @@ describe('AppointmentSearch', () => {
     render(<AppointmentSearch />, { wrapper: createWrapper() })
 
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
-    await user.type(searchInput, 'Cardio')
+    await user.type(searchInput, 'Clínicos')
 
     await longWaitFor(() => {
-      expect(screen.getByText('Especialidad')).toBeInTheDocument()
+      expect(screen.getByText('Laboratorio')).toBeInTheDocument()
     })
   })
 
