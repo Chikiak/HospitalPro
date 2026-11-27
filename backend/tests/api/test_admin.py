@@ -1,11 +1,13 @@
 import pytest
 import pytest_asyncio
-from datetime import time
+from datetime import time, datetime, timedelta
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_password_hash
 from app.core.config import settings
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.category_schedule import CategorySchedule, CategoryType, RotationType
 from app.models.system_config import SystemConfig
 from app.models.user import User, UserRole
@@ -584,3 +586,153 @@ async def test_create_schedule_default_rotation_weeks(client: AsyncClient, test_
     assert response.status_code == 201
     data = response.json()
     assert data["rotation_weeks"] == 1  # Default value
+
+
+# ── F2-07: guardia de borrado de categorías con citas activas ─────────────
+
+async def _create_appointment(
+    test_db: AsyncSession, patient_id: int, specialty: str, status: AppointmentStatus
+) -> Appointment:
+    """Inserta una cita vinculada a una categoría por specialty."""
+    appointment = Appointment(
+        patient_id=patient_id,
+        appointment_date=datetime.now() + timedelta(days=1),
+        specialty=specialty,
+        status=status,
+    )
+    test_db.add(appointment)
+    await test_db.commit()
+    return appointment
+
+
+def _cardiology_schedules(schedules: list[dict]) -> list[dict]:
+    return [s for s in schedules if s["name"] == "Cardiology"]
+
+
+@pytest.mark.asyncio
+async def test_delete_category_with_active_scheduled_appointment_409(
+    client: AsyncClient,
+    admin_headers: dict,
+    test_db: AsyncSession,
+    patient_user: User,
+):
+    """Cita SCHEDULED vinculada por specialty: DELETE -> 409, sin borrar nada."""
+    await client.post("/admin/schedules", json=SCHEDULE_PAYLOAD, headers=admin_headers)
+    await _create_appointment(test_db, patient_user.id, "Cardiology", AppointmentStatus.SCHEDULED)
+
+    response = await client.delete("/admin/categories/Cardiology", headers=admin_headers)
+    assert response.status_code == 409
+
+    # La categoría y su horario siguen intactos (sin efectos parciales).
+    list_response = await client.get("/admin/schedules", headers=admin_headers)
+    assert list_response.status_code == 200
+    assert len(_cardiology_schedules(list_response.json())) == 1
+
+
+@pytest.mark.asyncio
+async def test_delete_category_with_active_confirmed_appointment_409(
+    client: AsyncClient,
+    admin_headers: dict,
+    test_db: AsyncSession,
+    patient_user: User,
+):
+    """Cita CONFIRMED vinculada por specialty: DELETE -> 409, sin borrar nada."""
+    await client.post("/admin/schedules", json=SCHEDULE_PAYLOAD, headers=admin_headers)
+    await _create_appointment(test_db, patient_user.id, "Cardiology", AppointmentStatus.CONFIRMED)
+
+    response = await client.delete("/admin/categories/Cardiology", headers=admin_headers)
+    assert response.status_code == 409
+
+    list_response = await client.get("/admin/schedules", headers=admin_headers)
+    assert list_response.status_code == 200
+    assert len(_cardiology_schedules(list_response.json())) == 1
+
+
+@pytest.mark.asyncio
+async def test_delete_category_active_appointment_no_partial_effects(
+    client: AsyncClient,
+    admin_headers: dict,
+    test_db: AsyncSession,
+    patient_user: User,
+):
+    """El 409 no deja efectos parciales: horario y cita siguen tal como estaban."""
+    await client.post("/admin/schedules", json=SCHEDULE_PAYLOAD, headers=admin_headers)
+    await _create_appointment(test_db, patient_user.id, "Cardiology", AppointmentStatus.SCHEDULED)
+
+    assert (await client.delete("/admin/categories/Cardiology", headers=admin_headers)).status_code == 409
+
+    list_response = await client.get("/admin/schedules", headers=admin_headers)
+    assert list_response.status_code == 200
+    assert len(_cardiology_schedules(list_response.json())) == 1
+
+    result = await test_db.execute(select(Appointment).where(Appointment.specialty == "Cardiology"))
+    appointments = result.scalars().all()
+    assert len(appointments) == 1
+    assert appointments[0].status == AppointmentStatus.SCHEDULED
+
+
+@pytest.mark.asyncio
+async def test_delete_category_with_terminal_appointments_200(
+    client: AsyncClient,
+    admin_headers: dict,
+    test_db: AsyncSession,
+    patient_user: User,
+):
+    """Citas CANCELLED y COMPLETED (estados terminales del enum): DELETE -> 200 y se borra."""
+    await client.post("/admin/schedules", json=SCHEDULE_PAYLOAD, headers=admin_headers)
+    await _create_appointment(test_db, patient_user.id, "Cardiology", AppointmentStatus.CANCELLED)
+    await _create_appointment(test_db, patient_user.id, "Cardiology", AppointmentStatus.COMPLETED)
+
+    response = await client.delete("/admin/categories/Cardiology", headers=admin_headers)
+    assert response.status_code == 200
+
+    list_response = await client.get("/admin/schedules", headers=admin_headers)
+    assert list_response.status_code == 200
+    assert len(_cardiology_schedules(list_response.json())) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_category_after_cancelling_active_appointment_200(
+    client: AsyncClient,
+    admin_headers: dict,
+    test_db: AsyncSession,
+    patient_user: User,
+):
+    """Al cancelar la única cita activa el borrado vuelve a estar permitido (200)."""
+    await client.post("/admin/schedules", json=SCHEDULE_PAYLOAD, headers=admin_headers)
+    await _create_appointment(test_db, patient_user.id, "Cardiology", AppointmentStatus.SCHEDULED)
+
+    assert (await client.delete("/admin/categories/Cardiology", headers=admin_headers)).status_code == 409
+
+    result = await test_db.execute(select(Appointment).where(Appointment.specialty == "Cardiology"))
+    appointment = result.scalar_one()
+    appointment.status = AppointmentStatus.CANCELLED
+    await test_db.commit()
+
+    response = await client.delete("/admin/categories/Cardiology", headers=admin_headers)
+    assert response.status_code == 200
+
+    list_response = await client.get("/admin/schedules", headers=admin_headers)
+    assert len(_cardiology_schedules(list_response.json())) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_category_without_appointments_200(
+    client: AsyncClient, admin_headers: dict
+):
+    """Sin citas vinculadas: comportamiento 200 previo, categoría borrada."""
+    await client.post("/admin/schedules", json=SCHEDULE_PAYLOAD, headers=admin_headers)
+
+    response = await client.delete("/admin/categories/Cardiology", headers=admin_headers)
+    assert response.status_code == 200
+    assert response.json()["message"] == "Category Cardiology and its schedules deleted successfully"
+
+    list_response = await client.get("/admin/schedules", headers=admin_headers)
+    assert len(_cardiology_schedules(list_response.json())) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_category_nonexistent_200(client: AsyncClient, admin_headers: dict):
+    """Categoría inexistente (sin horarios ni citas): 200, borrado idempotente."""
+    response = await client.delete("/admin/categories/Radiology", headers=admin_headers)
+    assert response.status_code == 200

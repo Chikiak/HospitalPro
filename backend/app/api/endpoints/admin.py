@@ -1,12 +1,13 @@
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy import and_, delete, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
 from app.core.rate_limit import limiter
+from app.models.appointment import Appointment, AppointmentStatus
 from app.models.category_schedule import CategorySchedule
 from app.models.user import User
 from app.schemas.category_schedule import (
@@ -174,7 +175,47 @@ async def delete_category(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Delete all schedules related to a category name.
-    Requires authenticated admin user (JWT). Rate limit: 10 requests per minute."""
+    Requires authenticated admin user (JWT). Rate limit: 10 requests per minute.
+
+    Rechaza 409 sin borrar nada cuando existen citas activas vinculadas a la
+    categoría por specialty == name (SCHEDULED o CONFIRMED). Cualquier estado
+    terminal del enum (CANCELLED, COMPLETED) no bloquea el borrado.
+
+    La operación es atómica: el chequeo y el borrado se ejecutan en la misma
+    transacción y las filas de horarios de la categoría se bloquean con
+    FOR UPDATE, la misma estrategia que usa el bloqueo de reservas F2-03, para
+    que una reserva concurrente no pueda colarse entre el chequeo y el borrado.
+    """
+    # Bloquear filas de horarios de esta categoría (misma regla que usa F2-03
+    # al reservar) para serializar comprobación y borrado ante reservas
+    # concurrentes sobre la misma categoría.
+    await db.execute(
+        select(CategorySchedule)
+        .where(CategorySchedule.name == name)
+        .with_for_update()
+    )
+
+    # ¿Existen citas activas vinculadas a esta categoría?
+    active_result = await db.execute(
+        select(func.count(Appointment.id)).where(
+            and_(
+                Appointment.specialty == name,
+                Appointment.status.in_(
+                    [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]
+                ),
+            )
+        )
+    )
+    active_count = active_result.scalar_one()
+
+    if active_count > 0:
+        # 409 sin borrar: solo se han ejecutado SELECT, la sesión se revierte
+        # al cerrarse y no hay efectos parciales.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"No se puede eliminar la categoría '{name}': tiene citas activas",
+        )
+
     await db.execute(delete(CategorySchedule).where(CategorySchedule.name == name))
     await db.commit()
     return {"message": f"Category {name} and its schedules deleted successfully"}
