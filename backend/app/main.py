@@ -120,8 +120,11 @@ app.include_router(patients.router)
 async def generic_server_error_middleware(request: Request, call_next):
     try:
         return await call_next(request)
-    except ServiceUnavailable:
-        logger.exception("External service unavailable")
+    except ServiceUnavailable as exc:
+        # F2-06: nunca registrar str(exc) ni su traceback/causa (pueden contener
+        # credenciales, DSN o SQL). Diagnóstico server-side sanitizado: solo el
+        # tipo de excepción, nunca el mensaje ni el rastro de pila crudo.
+        logger.error("External service unavailable: %s", type(exc).__name__)
         return JSONResponse(
             status_code=503,
             content={"detail": "Servicio temporalmente no disponible"},
@@ -129,8 +132,11 @@ async def generic_server_error_middleware(request: Request, call_next):
     except HTTPException:
         # Functional client errors (4xx): propagate as-is, never convert to 500.
         raise
-    except Exception:
-        logger.exception("Unhandled server error")
+    except Exception as exc:
+        # F2-06: nunca registrar str(exc) ni su traceback/causa (pueden contener
+        # credenciales, DSN o SQL). Diagnóstico server-side sanitizado: solo el
+        # tipo de excepción, nunca el mensaje ni el rastro de pila crudo.
+        logger.error("Unhandled server error: %s", type(exc).__name__)
         return JSONResponse(
             status_code=500,
             content={"detail": "Error interno del servidor"},

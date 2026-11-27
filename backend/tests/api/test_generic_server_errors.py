@@ -4,14 +4,15 @@ These tests inject exceptions that carry sensitive markers (passwords, DSN,
 SQL, stack traces) and verify that:
 - the client-facing response never contains those markers nor SQL/stack/DSN,
 - the HTTP status is a generic 500/503 with a generic message,
-- server-side logging keeps the diagnostic (logger.exception) without
-  credentials.
+- server-side logging keeps the diagnostic (exception type) without
+  credentials: markers must not appear in ANY log output
+  (caplog.text nor any rec.exc_info traceback, causes included).
 
 Covered areas: patients (medical history), the Oracle adapter, and the
 generic catch-all middleware in app.main.
 """
-import json
 import logging
+import traceback
 from unittest.mock import patch
 
 import oracledb
@@ -35,6 +36,24 @@ ALL_MARKERS = (
     SENSITIVE_DSN_MARKER,
     SENSITIVE_SQL_MARKER,
 )
+
+MARKERS_AND_STACK = ALL_MARKERS + ("Traceback", "stack")
+
+
+def _assert_no_marker_in_log_output(caplog, extra=()):
+    """Markers must not appear in any log output: caplog.text nor any
+    record's exc_info traceback (causes included)."""
+    text = caplog.text
+    for marker in ALL_MARKERS + extra:
+        assert marker not in text, f"marker leaked into caplog.text: {marker!r}"
+
+    for rec in caplog.records:
+        if rec.exc_info is not None:
+            formatted = "".join(traceback.format_exception(*rec.exc_info))
+            for marker in ALL_MARKERS + extra:
+                assert marker not in formatted, (
+                    f"marker leaked into record traceback: {marker!r}"
+                )
 
 
 @pytest.mark.asyncio
@@ -79,15 +98,14 @@ async def test_update_medical_history_500_hides_sensitive_markers(
     assert response.status_code == 500
     detail = response.json()["detail"]
     assert detail == "Error interno del servidor"
-    for marker in ALL_MARKERS + ("Traceback", "stack"):
+    for marker in MARKERS_AND_STACK:
         assert marker not in detail, f"marker leaked into 500 detail: {marker!r}"
 
+    # Server-side log: diagnostic present (type), no markers anywhere.
     messages = [rec.getMessage() for rec in caplog.records]
     assert any("Unhandled server error" in m for m in messages)
-    for marker in ALL_MARKERS:
-        assert not any(marker in m for m in messages), (
-            f"marker leaked into server log: {marker!r}"
-        )
+    assert any("Exception" in m for m in messages), "diagnostic (exception type) missing"
+    _assert_no_marker_in_log_output(caplog, extra=MARKERS_AND_STACK[3:])
 
 
 @pytest.mark.asyncio
@@ -134,10 +152,8 @@ async def test_update_medical_history_503_service_unavailable_hides_markers(
 
     messages = [rec.getMessage() for rec in caplog.records]
     assert any("External service unavailable" in m for m in messages)
-    for marker in ALL_MARKERS:
-        assert not any(marker in m for m in messages), (
-            f"marker leaked into server log: {marker!r}"
-        )
+    assert any("ServiceUnavailable" in m for m in messages), "diagnostic (exception type) missing"
+    _assert_no_marker_in_log_output(caplog)
 
 
 def test_oracle_adapter_hides_dsn_and_password():
