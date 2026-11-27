@@ -334,11 +334,25 @@ async def get_all_appointments(
 ) -> List[AppointmentResponse]:
     """
     Get all appointments with optional filters.
-    Restricted to Staff/Admin/Doctor.
+    Control de acceso por rol (minimo privilegio, F2-04):
+
+    - admin / staff: listado completo autorizado (todas las citas con sus
+      filtros opcionales).
+    - doctor: denegado por defecto. Como no existe una relacion real de
+      asignacion medico-cita (Appointment no tiene doctor_id y no hay flujo
+      de asignacion), un medico nunca recibe citas de otros pacientes ni
+      datos sensibles de terceros; se devuelve la coleccion vacia []
+      documentada en lugar del listado masivo.
+    - patient: 403.
     """
-    if current_user.role not in [UserRole.ADMIN, UserRole.STAFF, UserRole.DOCTOR]:
+    if current_user.role == UserRole.PATIENT:
         raise HTTPException(status_code=403, detail="Not authorized to view all appointments")
-    
+
+    if current_user.role == UserRole.DOCTOR:
+        # Deny-by-default: sin asignacion real no se expone listado alguno.
+        return []
+
+    # admin / staff: comportamiento autorizado previo, sin cambios.
     query = select(Appointment).options(joinedload(Appointment.patient))
     conditions = []
     
