@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, date as dt_date
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select, and_, func, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +9,14 @@ from sqlalchemy.orm import joinedload
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.rate_limit import (
+    BOOK_IDENTITY_LIMIT,
+    IP_LIMIT,
+    KEY_PREFIX_BOOK,
+    check_limit,
+    get_client_ip,
+    identity_key,
+)
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.category_schedule import CategorySchedule, CategoryType
 from app.models.user import User, UserRole
@@ -110,6 +118,7 @@ async def get_my_appointments(
 
 @router.post("/book", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
 async def book_appointment(
+    request: Request,
     booking: BookAppointmentRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
@@ -128,7 +137,18 @@ async def book_appointment(
       invariant holds even under concurrent bookings (409 when full or on
       serialization conflict).
     Patients can only book their own appointment (patient_id = current_user).
+    Rate limit: 10 requests per minute per authenticated user (sub/DNI), plus
+    the existing IP limit.
     """
+    # --- Check de límites en frontera (después de validar body y auth) -------
+    # current_user ya fue resuelto por get_current_user (JWT validado).
+    check_limit(request, IP_LIMIT, f"ip:{get_client_ip(request)}", "ip")
+    check_limit(
+        request,
+        BOOK_IDENTITY_LIMIT,
+        identity_key(KEY_PREFIX_BOOK, current_user.dni),
+        "book",
+    )
     # --- 0. Aislamiento de escritura ---------------------------------------
     # En PostgreSQL se fuerza SERIALIZABLE a nivel de sesión (la sesión se
     # cierra al terminar la request, sin fugar a otras peticiones) para que
