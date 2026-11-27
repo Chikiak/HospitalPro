@@ -1,14 +1,22 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.password_policy import validate_min_password_length
 
 
 class PatientCreate(BaseModel):
     """Schema for creating a patient (step 1 of registration)."""
     dni: str = Field(..., min_length=11, max_length=11, pattern=r"^\d{11}$", description="DNI/Cedula")
     full_name: str = Field(..., min_length=1, max_length=255, description="Full name")
-    password: str = Field(..., min_length=6, description="Password")
+    password: str = Field(..., description="Password")
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        """Longitud mínima de contraseña: regla central de 8 caracteres (F2-08)."""
+        return validate_min_password_length(v)
 
 
 class TriageDataCreate(BaseModel):

@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Input from '../../../components/ui/Input'
 import Button from '../../../components/ui/Button'
+import { MIN_PASSWORD_LENGTH, minPasswordErrorMessage } from '../../../lib/passwordPolicy'
 
 const registerSchema = z.object({
     dni: z
@@ -10,7 +11,7 @@ const registerSchema = z.object({
         .length(11, 'El DNI debe tener exactamente 11 caracteres')
         .regex(/^\d+$/, 'El DNI debe contener solo números'),
     full_name: z.string().min(3, 'El nombre completo debe tener al menos 3 caracteres'),
-    password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+    password: z.string().min(MIN_PASSWORD_LENGTH, minPasswordErrorMessage()),
     confirmPassword: z.string().min(1, 'Debe confirmar su contraseña'),
 }).refine((data) => data.password === data.confirmPassword, {
     message: "Las contraseñas no coinciden",
@@ -62,7 +63,7 @@ export default function RegisterForm({ onSubmit }: RegisterFormProps) {
                 {...register('password')}
                 label="Contraseña"
                 type="password"
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 8 caracteres"
                 error={errors.password?.message}
                 autoComplete="new-password"
             />

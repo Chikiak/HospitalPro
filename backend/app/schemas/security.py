@@ -4,7 +4,15 @@ from app.models.category_schedule import CategoryType
 
 class AdminVerifyRequest(BaseModel):
     """Schema for admin password verification."""
-    password: str = Field(..., min_length=8, description="Admin password")
+    password: str = Field(..., description="Admin password")
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        """Longitud mínima de contraseña: regla central de 8 caracteres (F2-08)."""
+        from app.core.password_policy import validate_min_password_length
+
+        return validate_min_password_length(v)
 
 
 class StaffPasswordUpdateRequest(BaseModel):
@@ -15,7 +23,15 @@ class StaffPasswordUpdateRequest(BaseModel):
     usa para el login tras F2-05).
     """
     dni: str = Field(..., min_length=11, max_length=11, pattern=r"^\d{11}$", description="DNI del staff")
-    new_password: str = Field(..., min_length=8, description="Nueva contraseña")
+    new_password: str = Field(..., description="Nueva contraseña")
+
+    @field_validator("new_password", mode="before")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        """Longitud mínima de contraseña: regla central de 8 caracteres (F2-08)."""
+        from app.core.password_policy import validate_min_password_length
+
+        return validate_min_password_length(v)
 
 
 class AdminCategoryRequest(BaseModel):
