@@ -1,15 +1,23 @@
-from typing import Annotated
 import secrets
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
+from app.core.rate_limit import (
+    KEY_PREFIX_LOGIN,
+    KEY_PREFIX_REGISTER,
+    LOGIN_IDENTITY_LIMIT,
+    REGISTER_IDENTITY_LIMIT,
+    check_limit,
+    identity_key,
+    limiter,
+)
 from app.core.security import create_access_token, get_password_hash, verify_password
-from app.core.rate_limit import limiter
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, StaffLoginRequest, Token
 from app.schemas.user import UserCreate, UserResponse
@@ -31,11 +39,23 @@ async def login(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
     """Login endpoint - authenticate user and return access token.
-    
+
     Rate limit: 5 requests per minute to prevent brute force attacks.
+    Identity limit: 5 requests per minute per normalized DNI, so the same DNI
+    from different clients/IPs exhausts its own counter.
     """
+    # --- Check de identidad en frontera (despues de validar el body) ---------
+    # Cuenta el intento por DNI aunque las credenciales fallen, para prevenir
+    # fuerza bruta distribuida sin convertir el endpoint en un oracle de
+    # existencia de usuarios.
+    check_limit(
+        request,
+        LOGIN_IDENTITY_LIMIT,
+        identity_key(KEY_PREFIX_LOGIN, credentials.dni),
+        "login",
+    )
     auth_service = AuthService(db)
-    
+
     user = await auth_service.authenticate_user(credentials.dni, credentials.password)
     if not user:
         raise HTTPException(
@@ -43,7 +63,7 @@ async def login(
             detail="Credenciales incorrectas",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     access_token = auth_service.create_token(user)
     return Token(access_token=access_token, user=UserResponse.model_validate(user))
 
@@ -62,7 +82,15 @@ async def login_staff(
     login. Any failure (unknown DNI, wrong password, inactive account, wrong role)
     answers with the same generic 401 so there is no credential oracle.
     Rate limit: 3 requests per minute to prevent brute force attacks.
+    Identity limit: 5 requests per minute per normalized DNI.
     """
+    # --- Check de identidad en frontera (despues de validar el body) ---------
+    check_limit(
+        request,
+        LOGIN_IDENTITY_LIMIT,
+        identity_key(KEY_PREFIX_LOGIN, credentials.dni),
+        "login",
+    )
     auth_service = AuthService(db)
 
     user = await auth_service.authenticate_staff(credentials.dni, credentials.password)
@@ -79,6 +107,7 @@ async def login_staff(
 
 from app.schemas.security import AdminVerifyRequest, StaffPasswordUpdateRequest
 
+
 @router.post("/verify-admin", status_code=status.HTTP_200_OK)
 @limiter.limit("3/minute")
 async def verify_admin(
@@ -90,19 +119,22 @@ async def verify_admin(
     """Verify admin password for sensitive operations.
     Requires authenticated admin user (JWT). Rate limit: 3 requests per minute."""
     from sqlalchemy import select
+
     from app.models.system_config import SystemConfig
-    
-    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "admin_password"))
+
+    result = await db.execute(
+        select(SystemConfig).where(SystemConfig.key == "admin_password")
+    )
     config = result.scalar_one_or_none()
-    
+
     stored = config.value if config else None
-    
+
     if not stored:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Admin authentication is not configured",
         )
-    
+
     if not _is_bcrypt_hash(stored):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -112,13 +144,13 @@ async def verify_admin(
                 "system_config a hash bcrypt antes de autenticar."
             ),
         )
-    
+
     if not verify_password(credentials.password, stored):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas",
         )
-    
+
     return {"message": "Admin verified"}
 
 
@@ -138,6 +170,7 @@ async def update_staff_password(
     configuración. Rate limit: 3 requests per minute.
     """
     from sqlalchemy import select
+
     from app.models.user import User, UserRole
 
     result = await db.execute(select(User).where(User.dni == request_data.dni))
@@ -154,7 +187,9 @@ async def update_staff_password(
     return {"message": "Contraseña de personal actualizada correctamente"}
 
 
-@router.post("/users/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/users/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+)
 @limiter.limit("5/minute")
 async def register(
     request: Request,
@@ -162,8 +197,17 @@ async def register(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserResponse:
     """Register a new user."""
+    # --- Check de identidad en frontera (despues de validar el body) ---------
+    # El mismo DNI desde distintos clientes/IPs agota su propio contador;
+    # identidades distintas no lo comparten.
+    check_limit(
+        request,
+        REGISTER_IDENTITY_LIMIT,
+        identity_key(KEY_PREFIX_REGISTER, user_data.dni),
+        "register",
+    )
     auth_service = AuthService(db)
-    
+
     try:
         user = await auth_service.create_user(
             dni=user_data.dni,
