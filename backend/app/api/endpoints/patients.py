@@ -62,7 +62,11 @@ async def update_medical_history(
             )
         
         # Data Mapping: If medication_allergies is in medical_history, use it for top-level allergies if empty
-        medical_history = data.medical_history or {}
+        medical_history = (
+            data.medical_history.model_dump(exclude_none=True)
+            if data.medical_history
+            else {}
+        )
         allergies = data.allergies
         
         if not allergies and medical_history and "medication_allergies" in medical_history:

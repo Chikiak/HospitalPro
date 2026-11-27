@@ -94,7 +94,7 @@ class TestTriageUpdate:
             "allergies": "penicillin, peanuts"
         }
         triage = TriageUpdate(**data)
-        assert triage.medical_history == data["medical_history"]
+        assert triage.medical_history.model_dump(exclude_none=True) == data["medical_history"]
         assert triage.allergies == "penicillin, peanuts"
     
     def test_valid_triage_update_partial(self):
@@ -103,9 +103,9 @@ class TestTriageUpdate:
             "medical_history": {"chronic_conditions": ["diabetes"]}
         }
         triage = TriageUpdate(**data)
-        assert triage.medical_history == data["medical_history"]
+        assert triage.medical_history.model_dump(exclude_none=True) == data["medical_history"]
         assert triage.allergies is None
-    
+
     def test_valid_triage_update_empty(self):
         """Test creating a TriageUpdate with no fields."""
         data = {}
@@ -133,13 +133,13 @@ class TestTriageDataCreate:
         }
         triage_data = TriageDataCreate(**data)
         assert triage_data.patient_id == 1
-        assert triage_data.medical_history == data["medical_history"]
+        assert triage_data.medical_history.model_dump(exclude_none=True) == data["medical_history"]
         assert triage_data.allergies == "dust"
 
 
 class TestTriageDataUpdate:
     """Test TriageDataUpdate schema."""
-    
+
     def test_valid_triage_data_update(self):
         """Test creating a valid TriageDataUpdate."""
         data = {
@@ -147,5 +147,5 @@ class TestTriageDataUpdate:
             "allergies": "none"
         }
         triage_data = TriageDataUpdate(**data)
-        assert triage_data.medical_history == data["medical_history"]
+        assert triage_data.medical_history.model_dump(exclude_none=True) == data["medical_history"]
         assert triage_data.allergies == "none"
