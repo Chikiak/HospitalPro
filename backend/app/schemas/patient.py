@@ -4,6 +4,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.password_policy import validate_min_password_length
+from app.schemas.medical_record import MedicalHistoryWrite
 
 
 class PatientCreate(BaseModel):
@@ -22,19 +23,19 @@ class PatientCreate(BaseModel):
 class TriageDataCreate(BaseModel):
     """Schema for creating triage data."""
     patient_id: int = Field(..., description="Patient user ID")
-    medical_history: Optional[dict[str, Any]] = Field(None, description="Patient medical history as JSON object with flexible fields")
+    medical_history: Optional[MedicalHistoryWrite] = Field(None, description="Patient medical history as JSON object with known keys")
     allergies: Optional[str] = Field(None, description="Patient allergies")
 
 
 class TriageDataUpdate(BaseModel):
     """Schema for updating triage data."""
-    medical_history: Optional[dict[str, Any]] = Field(None, description="Patient medical history as JSON object with flexible fields")
+    medical_history: Optional[MedicalHistoryWrite] = Field(None, description="Patient medical history as JSON object with known keys")
     allergies: Optional[str] = Field(None, description="Patient allergies")
 
 
 class TriageUpdate(BaseModel):
     """Schema for updating patient triage information (step 2 of registration)."""
-    medical_history: Optional[dict[str, Any]] = Field(None, description="Patient medical history as JSON object with flexible fields")
+    medical_history: Optional[MedicalHistoryWrite] = Field(None, description="Patient medical history as JSON object with known keys")
     allergies: Optional[str] = Field(None, description="Patient allergies")
 
 
