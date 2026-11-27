@@ -751,3 +751,104 @@ async def test_book_appointment_specialty_same_day_another_hour_409(client: Asyn
     )
 
     assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test_appointments_all_doctor_receives_empty_list_200(client: AsyncClient, test_db: AsyncSession, make_token):
+    """Doctor sin citas asignadas: 200 y coleccion vacia, nunca datos de otros pacientes.
+
+    F2-04: sin una relacion real de asignacion medico-cita (no hay doctor_id
+    ni flujo de asignacion), GET /appointments/all devuelve [] a cualquier
+    medico en lugar del listado masivo de citas ajenas.
+    """
+    # Dos medicos sin citas asignadas
+    for dni, name in (("DOCTOR001", "Medico Uno"), ("DOCTOR002", "Medico Dos")):
+        test_db.add(
+            User(dni=dni, hashed_password="hashed", full_name=name, role=UserRole.DOCTOR, is_active=True)
+        )
+    # Paciente con una cita no asignada a ningun medico
+    test_db.add(
+        User(dni="PACIENTE_F204", hashed_password="hashed", full_name="Paciente F2-04", role=UserRole.PATIENT, is_active=True)
+    )
+    await test_db.commit()
+    result = await test_db.execute(select(User).where(User.dni == "PACIENTE_F204"))
+    patient = result.scalar_one()
+    test_db.add(
+        Appointment(
+            patient_id=patient.id,
+            appointment_date=datetime.now() + timedelta(days=7),
+            specialty="Cardiologia",
+            status=AppointmentStatus.SCHEDULED,
+            notes="Cita ajena a ambos medicos",
+        )
+    )
+    await test_db.commit()
+
+    for dni in ("DOCTOR001", "DOCTOR002"):
+        token = make_token(dni=dni, role="doctor")
+        response = await client.get(
+            "/appointments/all",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body == [], f"{dni} no debe recibir citas de otros pacientes"
+        assert not any(field in str(body) for field in ("Paciente F2-04", "Cardiologia", "Cita ajena"))
+
+
+@pytest.mark.asyncio
+async def test_appointments_all_admin_and_staff_receive_full_list_200(client: AsyncClient, test_db: AsyncSession, make_token):
+    """Admin y staff conservan el listado autorizado, incluidos datos sensibles de pacientes."""
+    test_db.add(
+        User(dni="ADMIN_F204", hashed_password="hashed", full_name="Admin F2-04", role=UserRole.ADMIN, is_active=True)
+    )
+    test_db.add(
+        User(dni="STAFF_F204", hashed_password="hashed", full_name="Staff F2-04", role=UserRole.STAFF, is_active=True)
+    )
+    test_db.add(
+        User(dni="PACIENTE_F204B", hashed_password="hashed", full_name="Paciente F2-04-B", role=UserRole.PATIENT, is_active=True)
+    )
+    await test_db.commit()
+    result = await test_db.execute(select(User).where(User.dni == "PACIENTE_F204B"))
+    patient = result.scalar_one()
+    test_db.add(
+        Appointment(
+            patient_id=patient.id,
+            appointment_date=datetime.now() + timedelta(days=7),
+            specialty="Cardiologia",
+            status=AppointmentStatus.SCHEDULED,
+            notes="Campo sensible: notas de la cita",
+        )
+    )
+    await test_db.commit()
+
+    for dni, role in (("ADMIN_F204", "admin"), ("STAFF_F204", "staff")):
+        token = make_token(dni=dni, role=role)
+        response = await client.get(
+            "/appointments/all",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["patient_name"] == "Paciente F2-04-B"
+        assert data[0]["specialty"] == "Cardiologia"
+        assert data[0]["notes"] == "Campo sensible: notas de la cita"
+
+
+@pytest.mark.asyncio
+async def test_appointments_all_patient_403(client: AsyncClient, test_db: AsyncSession, make_token):
+    """Paciente en GET /appointments/all: 403, sin listado masivo (F2-04)."""
+    test_db.add(
+        User(dni="PACIENTE_F204C", hashed_password="hashed", full_name="Paciente F2-04-C", role=UserRole.PATIENT, is_active=True)
+    )
+    await test_db.commit()
+
+    token = make_token(dni="PACIENTE_F204C", role="patient")
+    response = await client.get(
+        "/appointments/all",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"] == "Not authorized to view all appointments"
