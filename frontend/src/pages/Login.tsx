@@ -33,10 +33,10 @@ export default function Login() {
     }
   }
 
-  const handleStaffLogin = async (data: { password: string }) => {
+  const handleStaffLogin = async (data: { dni: string; password: string }) => {
     try {
       setError(null)
-      await staffLogin(data.password)
+      await staffLogin(data.dni, data.password)
       // Redirect to dashboard on successful login
       navigate('/')
     } catch (err) {

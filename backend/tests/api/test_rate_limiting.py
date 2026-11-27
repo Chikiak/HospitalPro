@@ -62,7 +62,7 @@ async def test_staff_login_rate_limit_is_enforced(client: AsyncClient, test_db: 
     for _ in range(max_attempts):
         response = await client.post(
             "/auth/login/staff",
-            json={"password": "wrongpassword"},
+            json={"dni": "99999999999", "password": "wrongpassword"},
         )
         
         if response.status_code == 429:

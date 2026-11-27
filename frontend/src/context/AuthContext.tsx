@@ -15,7 +15,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   login: (dni: string, password: string) => Promise<void>
-  staffLogin: (password: string) => Promise<void>
+  staffLogin: (dni: string, password: string) => Promise<void>
   register: (data: RegisterData) => Promise<void>
   logout: () => void
 }
@@ -110,10 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const staffLogin = async (password: string) => {
+  const staffLogin = async (dni: string, password: string) => {
     setIsLoading(true)
     try {
       const response = await api.post('/auth/login/staff', {
+        dni,
         password,
       })
 

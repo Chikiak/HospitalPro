@@ -29,30 +29,40 @@ class TestAdminVerifyRequest:
 
 
 class TestStaffPasswordUpdateRequest:
-    """Test StaffPasswordUpdateRequest schema."""
+    """Test StaffPasswordUpdateRequest schema (F2-05: dni + new_password)."""
 
     def test_staff_password_update_request_valid(self):
-        """StaffPasswordUpdateRequest accepts valid new_staff_password."""
+        """StaffPasswordUpdateRequest accepts valid dni and new_password."""
         request = StaffPasswordUpdateRequest(
-            new_staff_password="newstaffpass123",
+            dni="12345678901",
+            new_password="aaaaaaaa",
         )
-        assert request.new_staff_password == "newstaffpass123"
+        assert request.dni == "12345678901"
+        assert request.new_password == "aaaaaaaa"
+
+    def test_staff_password_update_request_requires_dni(self):
+        """StaffPasswordUpdateRequest requires dni."""
+        with pytest.raises(ValidationError):
+            StaffPasswordUpdateRequest(new_password="aaaaaaaa")
+
+    def test_staff_password_update_request_requires_new_password(self):
+        """StaffPasswordUpdateRequest requires new_password."""
+        with pytest.raises(ValidationError):
+            StaffPasswordUpdateRequest(dni="12345678901")
 
     def test_staff_password_update_request_rejects_short_new_password(self):
-        """StaffPasswordUpdateRequest rejects new_staff_password shorter than 8."""
+        """StaffPasswordUpdateRequest rejects new_password shorter than 8."""
         with pytest.raises(ValidationError):
             StaffPasswordUpdateRequest(
-                new_staff_password="short1",
+                dni="12345678901",
+                new_password="short1",
             )
 
-    def test_staff_password_update_request_ignores_extra_admin_password(self):
-        """StaffPasswordUpdateRequest ignores admin_password if sent by legacy client (Pydantic extra='ignore')."""
-        request = StaffPasswordUpdateRequest(
-            new_staff_password="newstaffpass123",
-            admin_password="should-be-ignored",
-        )
-        assert request.new_staff_password == "newstaffpass123"
-        assert not hasattr(request, "admin_password")
+    def test_staff_password_update_request_rejects_bad_dni(self):
+        """StaffPasswordUpdateRequest rejects DNIs that are not exactly 11 digits."""
+        for dni in ("12345", "123456789012", "1234567890a"):
+            with pytest.raises(ValidationError):
+                StaffPasswordUpdateRequest(dni=dni, new_password="aaaaaaaa")
 
 
 class TestAdminDniRequest:
@@ -129,7 +139,7 @@ def test_admin_dni_request_requires_11_digits():
 
 
 def test_admin_password_min_length():
-    """AdminVerifyRequest (password) y StaffPasswordUpdateRequest (new_staff_password) rechazan <8 y aceptan 8."""
+    """AdminVerifyRequest (password) y StaffPasswordUpdateRequest (new_password) rechazan <8 y aceptan 8."""
     # AdminVerifyRequest acepta 8 caracteres
     req = AdminVerifyRequest(password="aaaaaaaa")
     assert req.password == "aaaaaaaa"
@@ -142,14 +152,13 @@ def test_admin_password_min_length():
     with pytest.raises(ValidationError):
         AdminVerifyRequest(password="short1")
 
-    # StaffPasswordUpdateRequest acepta 8 caracteres en new_staff_password
-    req = StaffPasswordUpdateRequest(
-        new_staff_password="newstaff",
-    )
-    assert req.new_staff_password == "newstaff"
+    # StaffPasswordUpdateRequest acepta 8 caracteres en new_password
+    req = StaffPasswordUpdateRequest(dni="12345678901", new_password="aaaaaaaa")
+    assert req.new_password == "aaaaaaaa"
 
-    # StaffPasswordUpdateRequest rechaza new_staff_password de 7 caracteres
+    # StaffPasswordUpdateRequest rechaza new_password de 7 caracteres
     with pytest.raises(ValidationError):
         StaffPasswordUpdateRequest(
-            new_staff_password="newstaf",  # 7 caracteres
+            dni="12345678901",
+            new_password="newstaf",  # 7 caracteres
         )

@@ -29,8 +29,3 @@ class UserResponse(BaseModel):
         if hasattr(v, "value"):
             return v.value.lower()
         return v
-
-
-class StaffLoginRequest(BaseModel):
-    """Schema for staff login request."""
-    password: str = Field(..., min_length=6, description="Password")
