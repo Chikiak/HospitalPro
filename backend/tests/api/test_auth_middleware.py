@@ -141,7 +141,10 @@ async def test_staff_can_access_all_patients(client: AsyncClient, test_db: Async
     """Test that staff can access all patient records."""
     # Create a patient
     allowed_repo = AllowedPersonRepository(test_db)
-    await allowed_repo.bulk_create([{"dni": "11111111111", "full_name": "Patient User"}])
+    await allowed_repo.bulk_create([
+        {"dni": "11111111111", "full_name": "Patient User"},
+        {"dni": "99999999999", "full_name": "Staff User"},
+    ])
     
     patient_response = await client.post(
         "/auth/users/register",
