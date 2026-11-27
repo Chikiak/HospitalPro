@@ -7,12 +7,15 @@ the specific rate limit behavior.
 """
 
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
+import httpx
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import get_db
 from app.core.security import create_access_token
 from app.main import app
 from app.models.user import User, UserRole
@@ -363,4 +366,129 @@ async def test_book_counter_reset(client: AsyncClient, test_db: AsyncSession):
     response = await client.post("/appointments/book", json=book_body, headers=headers)
     assert response.status_code != 429, (
         f"Counter should reset, got {response.status_code}"
+    )
+
+
+@asynccontextmanager
+async def _async_client_with_ip(test_db: AsyncSession, ip: str):
+    """AsyncClient cuyo request.client.host es `ip` (IP de conexión real)."""
+
+    async def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    transport = httpx.ASGITransport(app=app, client=(ip, 1234))
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_login_same_dni_distinct_ips_exhaust_identity_counter(test_db: AsyncSession):
+    """Mismo DNI desde IPs de conexión distintas agota UN contador por identidad.
+
+    Las primeras 5 peticiones (alternando dos IPs) no son 429; la 6ª sí.
+    Otra identidad desde una tercera IP no se ve afectada y la 429 no filtra
+    DNI ni password.
+    """
+    app.state.limiter._storage.reset()
+    dni = "10000000001"
+
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": dni}])
+
+    async with _async_client_with_ip(test_db, "10.0.0.1") as ac:
+        await ac.post(
+            "/auth/users/register",
+            json={
+                "dni": dni,
+                "password": "SecurePass123!",
+                "full_name": "Ip Login User",
+                "role": "patient",
+            },
+        )
+
+    responses = []
+    for i in range(6):
+        ip = "10.0.0.1" if i % 2 == 0 else "10.0.0.2"
+        async with _async_client_with_ip(test_db, ip) as ac:
+            responses.append(
+                await ac.post(
+                    "/auth/login/access-token",
+                    json={"dni": dni, "password": "wrongpassword"},
+                )
+            )
+
+    assert all(r.status_code != 429 for r in responses[:5]), [
+        r.status_code for r in responses
+    ]
+    assert responses[5].status_code == 429, responses[5].status_code
+    # La 429 no filtra DNI ni password.
+    body = responses[5].text.lower()
+    assert "dni" not in body and "password" not in body
+
+    # Otra identidad desde una tercera IP: no 429 (su propio contador está limpio).
+    other_dni = "20000000002"
+    await allowed_repo.bulk_create([{"dni": other_dni}])
+    async with _async_client_with_ip(test_db, "10.0.0.3") as ac:
+        other_resp = await ac.post(
+            "/auth/login/access-token",
+            json={"dni": other_dni, "password": "whatever"},
+        )
+    assert other_resp.status_code != 429, other_resp.status_code
+
+
+@pytest.mark.asyncio
+async def test_book_same_user_distinct_ips_exhaust_identity_counter(
+    test_db: AsyncSession,
+):
+    """Mismo usuario autenticado desde dos IPs agota el contador de book (10/min).
+
+    Otro usuario desde una tercera IP no se ve afectado.
+    """
+    app.state.limiter._storage.reset()
+    future = (datetime.now() + timedelta(days=7)).isoformat()
+    book_body = {
+        "category_id": 99999,
+        "appointment_date": future,
+        "category_name": "Cardiologia",
+    }
+
+    for dni in ("BOOKIPA", "BOOKIPB"):
+        test_db.add(
+            User(
+                dni=dni,
+                hashed_password="x",
+                full_name=dni,
+                role=UserRole.PATIENT,
+                is_active=True,
+            )
+        )
+    await test_db.commit()
+
+    token_a = create_access_token(data={"sub": "BOOKIPA", "role": "patient"})
+    token_b = create_access_token(data={"sub": "BOOKIPB", "role": "patient"})
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    responses = []
+    for i in range(11):
+        ip = "10.0.0.1" if i % 2 == 0 else "10.0.0.2"
+        async with _async_client_with_ip(test_db, ip) as ac:
+            responses.append(
+                await ac.post("/appointments/book", json=book_body, headers=headers_a)
+            )
+
+    assert all(r.status_code != 429 for r in responses[:10]), [
+        r.status_code for r in responses
+    ]
+    assert responses[10].status_code == 429, responses[10].status_code
+
+    # Otro usuario desde una tercera IP: no comparte el contador (no 429).
+    async with _async_client_with_ip(test_db, "10.0.0.3") as ac:
+        resp_b = await ac.post(
+            "/appointments/book", json=book_body, headers=headers_b
+        )
+    assert resp_b.status_code != 429, (
+        f"User B should not share A's counter, got {resp_b.status_code}"
     )
