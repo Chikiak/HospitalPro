@@ -48,16 +48,28 @@ class TestPatientCreate:
             PatientCreate(**data)
         assert "dni" in str(exc_info.value).lower()
     
-    def test_patient_create_with_short_password(self):
-        """Test PatientCreate with password too short."""
+    @pytest.mark.parametrize("password", ["short", "aaaaaaa", "1234567"])
+    def test_patient_create_rejects_short_password(self, password):
+        """Test PatientCreate rejects passwords shorter than 8 characters (F2-08)."""
         data = {
             "dni": "12345678901",
             "full_name": "Jane Doe",
-            "password": "short"
+            "password": password,
         }
         with pytest.raises(ValidationError) as exc_info:
             PatientCreate(**data)
-        assert "at least 6 characters" in str(exc_info.value)
+        assert "al menos 8 caracteres" in str(exc_info.value)
+
+    @pytest.mark.parametrize("password", ["aaaaaaaa", "securepass123"])
+    def test_patient_create_accepts_password_of_eight_or_more(self, password):
+        """Test PatientCreate accepts passwords of 8 or more characters (F2-08)."""
+        data = {
+            "dni": "12345678901",
+            "full_name": "Jane Doe",
+            "password": password,
+        }
+        patient = PatientCreate(**data)
+        assert patient.password == password
     
     def test_patient_create_missing_required_fields(self):
         """Test PatientCreate with missing required fields."""

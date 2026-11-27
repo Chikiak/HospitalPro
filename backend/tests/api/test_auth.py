@@ -717,6 +717,51 @@ async def test_verify_admin_against_hash(client: AsyncClient, admin_headers: dic
     assert "incorrect" in bad.json()["detail"].lower()
 
 
+# ── F2-08: política mínima de contraseña en registro ──────────────────────
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("password", ["short", "aaaaaaa", "1234567"])
+async def test_register_rejects_password_shorter_than_eight(
+    client: AsyncClient, test_db: AsyncSession, password: str
+):
+    """Contraseña de menos de 8 caracteres → 422 en POST /auth/users/register."""
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "12345678901"}])
+
+    response = await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "12345678901",
+            "password": password,
+            "full_name": "Test User",
+            "role": "patient",
+        },
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_register_accepts_password_of_exactly_eight(client: AsyncClient, test_db: AsyncSession):
+    """Contraseña de exactamente 8 caracteres → 201 (contrato previsto)."""
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "12345678901"}])
+
+    response = await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "12345678901",
+            "password": "aaaaaaaa",
+            "full_name": "Test User",
+            "role": "patient",
+        },
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["dni"] == "12345678901"
+    assert data["full_name"] == "Test User"
+    assert data["role"] == "patient"
+
+
 @pytest.mark.asyncio
 @pytest.mark.asyncio
 async def test_verify_admin_missing_admin_password_returns_503(client: AsyncClient, test_db: AsyncSession, admin_headers: dict):

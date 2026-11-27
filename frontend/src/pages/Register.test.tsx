@@ -80,7 +80,7 @@ describe('Register', () => {
     await waitFor(() => {
       expect(screen.getByText(/el dni debe tener exactamente 11 caracteres/i)).toBeInTheDocument()
       expect(screen.getByText(/el nombre completo debe tener al menos 3 caracteres/i)).toBeInTheDocument()
-      expect(screen.getByText(/la contraseña debe tener al menos 6 caracteres/i)).toBeInTheDocument()
+      expect(screen.getByText(/la contraseña debe tener al menos 8 caracteres/i)).toBeInTheDocument()
     })
   })
 
@@ -105,7 +105,7 @@ describe('Register', () => {
     })
   })
 
-  it('validates password length', async () => {
+  it('rejects password shorter than 8 characters', async () => {
     const user = userEvent.setup()
     render(
       <BrowserRouter>
@@ -116,13 +116,39 @@ describe('Register', () => {
     )
 
     const passwordInput = screen.getByLabelText(/^contraseña$/i)
-    await user.type(passwordInput, '12345')
+    await user.type(passwordInput, '1234567')
 
     const submitButton = screen.getByRole('button', { name: /crear cuenta/i })
     await user.click(submitButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/la contraseña debe tener al menos 6 caracteres/i)).toBeInTheDocument()
+      expect(screen.getByText(/la contraseña debe tener al menos 8 caracteres/i)).toBeInTheDocument()
     })
+  })
+
+  it('accepts password of exactly 8 characters on the client', async () => {
+    const user = userEvent.setup()
+    render(
+      <BrowserRouter>
+        <AuthProvider>
+          <Register />
+        </AuthProvider>
+      </BrowserRouter>
+    )
+
+    await user.type(screen.getByLabelText(/dni/i), '12345678901')
+    await user.type(screen.getByLabelText(/nombre completo/i), 'Test User')
+    await user.type(screen.getByLabelText(/^contraseña$/i), 'password12')
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'password12')
+
+    const submitButton = screen.getByRole('button', { name: /crear cuenta/i })
+    await user.click(submitButton)
+
+    // No error de longitud de contraseña: el cliente aceptó 8 caracteres y
+    // intentó el registro (falla por falta de backend en el test, no por validación).
+    await waitFor(() => {
+      expect(screen.getByText(/error al registrarse/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/la contraseña debe tener al menos 8 caracteres/i)).not.toBeInTheDocument()
   })
 })
