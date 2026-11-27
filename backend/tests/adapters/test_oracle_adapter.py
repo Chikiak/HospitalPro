@@ -66,11 +66,18 @@ class TestOracleAdapter:
         """
         import oracledb
         
-        # Simulate connection failure
+        # Simulate connection failure carrying sensitive driver details.
         mock_connect.side_effect = oracledb.Error("Connection timeout")
-        
-        with pytest.raises(ServiceUnavailable, match="Failed to connect to Oracle database"):
+
+        with pytest.raises(
+            ServiceUnavailable,
+            match="No se pudo conectar al servicio de historial de pacientes",
+        ) as excinfo:
             adapter.get_patient_history("12345678")
+
+        # F2-06: the driver error (which may contain DSN/credentials) must not
+        # be embedded in the exception exposed to the application.
+        assert "Connection timeout" not in str(excinfo.value)
     
     @patch('app.adapters.oracle_adapter.oracledb.connect')
     def test_empty_result_returns_none(self, mock_connect, adapter):
