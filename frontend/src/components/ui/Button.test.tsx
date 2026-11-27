@@ -24,8 +24,8 @@ describe('Button', () => {
     render(<Button variant="primary">Primary</Button>)
     const button = screen.getByRole('button', { name: /primary/i })
     
-    expect(button).toHaveClass('bg-teal-700')
-    expect(button).toHaveClass('text-white')
+    expect(button).toHaveClass('bg-primary')
+    expect(button).toHaveClass('text-primary-foreground')
   })
 
   it('renders outline variant with correct styles', () => {
@@ -33,15 +33,15 @@ describe('Button', () => {
     const button = screen.getByRole('button', { name: /outline/i })
     
     expect(button).toHaveClass('border-2')
-    expect(button).toHaveClass('border-teal-700')
-    expect(button).toHaveClass('text-teal-700')
+    expect(button).toHaveClass('border-primary/20')
+    expect(button).toHaveClass('text-primary')
   })
 
   it('renders ghost variant with correct styles', () => {
     render(<Button variant="ghost">Ghost</Button>)
     const button = screen.getByRole('button', { name: /ghost/i })
     
-    expect(button).toHaveClass('text-teal-700')
+    expect(button).toHaveClass('text-primary')
   })
 
   it('is disabled when isLoading is true', () => {
@@ -54,7 +54,7 @@ describe('Button', () => {
   it('shows loading text when isLoading is true', () => {
     render(<Button isLoading>Submit</Button>)
     
-    expect(screen.getByText(/loading/i)).toBeInTheDocument()
+    expect(screen.getByText(/cargando/i)).toBeInTheDocument()
   })
 
   it('is disabled when disabled prop is true', () => {

@@ -63,8 +63,7 @@ describe('MainLayout', () => {
 
     // Staff navigation items should be visible
     expect(screen.getByRole('link', { name: /calendario/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /gestión de bloques/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /exportar/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /configuración/i })).toBeInTheDocument()
 
     // Patient navigation items should not be visible (except those shared)
     expect(screen.queryByRole('link', { name: /mis turnos/i })).not.toBeInTheDocument()
