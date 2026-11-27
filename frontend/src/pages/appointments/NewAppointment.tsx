@@ -32,7 +32,7 @@ export default function NewAppointment() {
     queryKey: ['admin-schedules'],
     queryFn: async () => {
       const response = await api.get('/admin/schedules')
-      const data = response.data as any[]
+      const data = response.data as Category[]
 
       // Deduplicate by name
       const uniqueMap = new Map<string, Category>()
@@ -210,7 +210,7 @@ export default function NewAppointment() {
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">Seleccione el Servicio</h2>
               <div className="w-full md:w-auto">
                 <Tabs
-                  onTabChange={(id) => setActiveType(id as any)}
+                  onTabChange={(id) => setActiveType(id as 'specialty' | 'laboratory')}
                   tabs={[
                     { id: 'specialty', label: 'Especialidades', icon: <Stethoscope size={16} /> },
                     { id: 'laboratory', label: 'Laboratorio', icon: <FlaskConical size={16} /> },

@@ -41,7 +41,7 @@ export default function StaffCalendar() {
             const startStr = formatLocalYMD(monthStart)
             const endStr = formatLocalYMD(monthEnd)
 
-            const params: any = {
+            const params: Record<string, string> = {
                 start_date: startStr,
                 end_date: endStr
             }
@@ -57,7 +57,7 @@ export default function StaffCalendar() {
         queryKey: ['categories'],
         queryFn: async () => {
             const res = await api.get('/admin/schedules')
-            return Array.isArray(res.data) ? Array.from(new Set(res.data.map((c: any) => c.name))) : []
+            return Array.isArray(res.data) ? Array.from(new Set((res.data as { name: string }[]).map((c) => c.name))) : []
         }
     })
 

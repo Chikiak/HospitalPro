@@ -133,7 +133,7 @@ export default function RegisterStep2() {
       let user
       try {
         user = JSON.parse(userStr)
-      } catch (e) {
+      } catch {
         setError('Error al leer información del usuario. Por favor, inicie sesión nuevamente.')
         return
       }
