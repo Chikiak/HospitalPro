@@ -23,7 +23,7 @@ let mock: MockAdapter
 
 beforeEach(() => {
   mock = new MockAdapter(api)
-  mock.onGet('/admin/schedules').reply(200, [
+  mock.onGet('/appointments/categories').reply(200, [
     { id: 1, name: 'Cardiología', category_type: 'specialty' },
     { id: 2, name: 'Laboratorio Clínico', category_type: 'laboratory' },
   ])

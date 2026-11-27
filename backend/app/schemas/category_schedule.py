@@ -57,3 +57,17 @@ class CategoryScheduleResponse(BaseModel):
     start_date: Optional[date] = None
     deadline_time: Optional[time] = None
     warning_message: Optional[str] = None
+
+
+class CategorySchedulePublic(BaseModel):
+    """Public category catalog.
+
+    Only the identity fields needed by patients to browse bookable services.
+    Deliberately excludes the administrative schedule template
+    (start_time, turn_duration, rotation, deadlines, warnings).
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    category_type: CategoryType

@@ -15,6 +15,7 @@ ADMIN_PASSWORD = settings.ADMIN_PASSWORD
 ADMIN_DNI = "11111111111"
 PATIENT_DNI = "22222222222"
 STAFF_DNI = "33333333333"
+DOCTOR_DNI = "55555555555"
 
 ADMIN_WRITE_ENDPOINTS = [
     ("POST", "/admin/schedules"),
@@ -55,9 +56,22 @@ async def staff_user(test_db: AsyncSession):
     return user
 
 
+@pytest_asyncio.fixture
+async def doctor_user(test_db: AsyncSession):
+    user = User(dni=DOCTOR_DNI, hashed_password="hashed", full_name="Doctor User", role=UserRole.DOCTOR, is_active=True)
+    test_db.add(user)
+    await test_db.commit()
+    return user
+
+
 @pytest.fixture
 def admin_token(make_token, admin_user):
     return make_token(dni=ADMIN_DNI, role="admin")
+
+
+@pytest.fixture
+def admin_headers(admin_token):
+    return {"Authorization": f"Bearer {admin_token}"}
 
 
 @pytest.fixture
@@ -71,8 +85,13 @@ def staff_token(make_token, staff_user):
 
 
 @pytest.fixture
-def admin_headers(admin_token):
-    return {"Authorization": f"Bearer {admin_token}"}
+def doctor_token(make_token, doctor_user):
+    return make_token(dni=DOCTOR_DNI, role="doctor")
+
+
+@pytest.fixture
+def doctor_headers(doctor_token):
+    return {"Authorization": f"Bearer {doctor_token}"}
 
 
 @pytest.fixture
@@ -155,7 +174,7 @@ async def test_admin_schedule_with_jwt(client: AsyncClient, admin_headers: dict)
     assert data["name"] == "Cardiology"
     assert data["day_of_week"] == 0
 
-    list_response = await client.get("/admin/schedules")
+    list_response = await client.get("/admin/schedules", headers=admin_headers)
     assert list_response.status_code == 200
     schedules = list_response.json()
     assert len(schedules) == 1
@@ -182,7 +201,7 @@ async def test_admin_category_lifecycle_with_jwt(
     assert del_response.status_code == 200
 
     # Verificar que los horarios de esa categoría se eliminaron
-    list_response = await client.get("/admin/schedules")
+    list_response = await client.get("/admin/schedules", headers=admin_headers)
     assert list_response.status_code == 200
     schedules = list_response.json()
     cardiology_schedules = [s for s in schedules if s["name"] == "Cardiology"]
@@ -223,11 +242,62 @@ async def test_admin_rate_limit(client: AsyncClient, admin_headers: dict):
     assert response.status_code == 429
 
 
-# ── GET /admin/schedules sigue público (sin cambios) ────────────────────
+# ── GET /admin/schedules ahora protegido (AC: 401, 403 patient, 200 staff+) ──
+
 
 @pytest.mark.asyncio
-async def test_list_schedules_empty(client: AsyncClient, test_db: AsyncSession):
+async def test_list_schedules_requires_auth(client: AsyncClient):
+    """GET /admin/schedules sin token de autorización devuelve 401."""
     response = await client.get("/admin/schedules")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_list_schedules_patient_forbidden(client: AsyncClient, patient_headers: dict):
+    """GET /admin/schedules con rol patient devuelve 403."""
+    response = await client.get("/admin/schedules", headers=patient_headers)
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_list_schedules_admin_200(client: AsyncClient, admin_headers: dict):
+    """GET /admin/schedules devuelve 200 para admin."""
+    response = await client.get("/admin/schedules", headers=admin_headers)
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_list_schedules_staff_200(client: AsyncClient, staff_headers: dict):
+    """GET /admin/schedules devuelve 200 para staff."""
+    response = await client.get("/admin/schedules", headers=staff_headers)
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_list_schedules_doctor_200(client: AsyncClient, doctor_headers: dict):
+    """GET /admin/schedules devuelve 200 para doctor."""
+    response = await client.get("/admin/schedules", headers=doctor_headers)
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_list_schedules_rate_limit(client: AsyncClient, admin_headers: dict):
+    """La 11ª petición GET /admin/schedules devuelve 429 (rate limiting)."""
+    for i in range(10):
+        response = await client.get("/admin/schedules", headers=admin_headers)
+        assert response.status_code == 200, f"Request {i+1} failed: {response.status_code}"
+
+    response = await client.get("/admin/schedules", headers=admin_headers)
+    assert response.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_list_schedules_empty(client: AsyncClient, admin_headers: dict):
+    """GET /admin/schedules con admin autenticado devuelve 200 y lista vacía."""
+    response = await client.get("/admin/schedules", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
@@ -273,7 +343,7 @@ async def test_list_schedules_with_data(client: AsyncClient, admin_headers: dict
         create_response = await client.post("/admin/schedules", json=schedule_data, headers=admin_headers)
         assert create_response.status_code == 201
 
-    list_response = await client.get("/admin/schedules")
+    list_response = await client.get("/admin/schedules", headers=admin_headers)
     assert list_response.status_code == 200
     data = list_response.json()
     assert isinstance(data, list)
