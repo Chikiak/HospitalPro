@@ -49,9 +49,9 @@ describe('Login Dual Mode', () => {
     const staffTab = screen.getByRole('button', { name: /personal/i })
     await user.click(staffTab)
     
-    // Should show only password field (staff mode)
+    // Staff mode shows DNI + password fields
     await waitFor(() => {
-      expect(screen.queryByLabelText(/^dni$/i)).not.toBeInTheDocument()
+      expect(screen.getByLabelText(/dni/i)).toBeInTheDocument()
       expect(screen.getByLabelText(/contraseña de personal/i)).toBeInTheDocument()
     })
   })
@@ -65,16 +65,17 @@ describe('Login Dual Mode', () => {
     await user.click(staffTab)
     
     await waitFor(() => {
-      expect(screen.queryByLabelText(/^dni$/i)).not.toBeInTheDocument()
+      expect(screen.getByLabelText(/contraseña de personal/i)).toBeInTheDocument()
     })
     
     // Then switch back to Patient
     const patientTab = screen.getByRole('button', { name: /paciente/i })
     await user.click(patientTab)
     
-    // Should show DNI field again
+    // Should show DNI + password (patient) fields again
     await waitFor(() => {
       expect(screen.getByLabelText(/dni/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
     })
   })
 

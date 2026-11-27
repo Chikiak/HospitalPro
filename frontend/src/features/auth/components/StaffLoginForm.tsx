@@ -5,6 +5,10 @@ import Input from '../../../components/ui/Input'
 import Button from '../../../components/ui/Button'
 
 const staffLoginSchema = z.object({
+  dni: z
+    .string()
+    .min(1, 'El DNI es requerido')
+    .regex(/^\d{11}$/, 'El DNI debe tener exactamente 11 dígitos'),
   password: z.string().min(1, 'La contraseña es requerida'),
 })
 
@@ -32,10 +36,19 @@ export default function StaffLoginForm({ onSubmit }: StaffLoginFormProps) {
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
       <Input
+        {...register('dni')}
+        label="DNI"
+        type="text"
+        placeholder="Ingrese su DNI"
+        error={errors.dni?.message}
+        autoComplete="username"
+      />
+
+      <Input
         {...register('password')}
         label="Contraseña de Personal"
         type="password"
-        placeholder="Ingrese la contraseña del personal"
+        placeholder="Ingrese su contraseña"
         error={errors.password?.message}
         autoComplete="current-password"
       />

@@ -8,8 +8,14 @@ class AdminVerifyRequest(BaseModel):
 
 
 class StaffPasswordUpdateRequest(BaseModel):
-    """Schema for updating the staff password."""
-    new_staff_password: str = Field(..., min_length=8, description="New staff password")
+    """Schema para actualizar la contraseña de un usuario staff real (F2-05).
+
+    El admin indica el DNI de un staff existente y activo y la nueva
+    contraseña; se actualiza ese User (system_config.staff_password ya no se
+    usa para el login tras F2-05).
+    """
+    dni: str = Field(..., min_length=11, max_length=11, pattern=r"^\d{11}$", description="DNI del staff")
+    new_password: str = Field(..., min_length=8, description="Nueva contraseña")
 
 
 class AdminCategoryRequest(BaseModel):

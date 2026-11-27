@@ -99,6 +99,33 @@ Salida esperada:
 
 No se importa en `main.py` ni se ejecuta en el arranque: el bootstrap es siempre un paso explícito de despliegue.
 
+### F2-05: Fin de la cuenta staff compartida · `POST /auth/login/staff`
+
+Desde `F2-05` el endpoint `POST /auth/login/staff` **ya no autentica contra `system_config.staff_password`** ni crea/reusa una cuenta compartida `dni="staff"`. Ahora autentica **DNI + contraseña contra un `User` existente, activo y con rol `STAFF`**, y el JWT lleva `sub` = DNI real del staff.
+
+**Contrato del endpoint**
+- Cuerpo: `{ "dni": "<11 dígitos>", "password": "<contraseña>" }`
+- Éxito (200): token de acceso con `sub` = DNI real y rol `staff`.
+- Fallo (401): `"Credenciales incorrectas"` genérico para DNI inexistente, contraseña errónea, cuenta inactiva o rol distinto de staff — sin oráculo que distinga los casos.
+- Rate limit: 3 peticiones por minuto (mantenido).
+
+**Migración operativa**
+1. Provisionar cada usuario staff de forma real y out-of-band con `create_admin.py`:
+   ```powershell
+   $env:ADMIN_DNI="12345678901"
+   $env:ADMIN_PASSWORD="AdminPass1234"
+   $env:STAFF_DNI="11111111111"      # DNI real del miembro de staff
+   $env:STAFF_PASSWORD="StaffPass1234"
+   python backend/scripts/create_admin.py
+   ```
+   `ensure_staff` crea (o devuelve, idempotente) un `User` con rol `STAFF`, `is_active=true` y contraseña hasheada. Nunca se emiten tokens sin un usuario persistido.
+2. Cada miembro de staff inicia sesión en `POST /auth/login/staff` con su **DNI real** y contraseña.
+3. La variable `STAFF_PASSWORD` sigue siendo obligatoria en el arranque (`settings`) y se usa como entrada de `POST /auth/update-staff-password`, pero **ya no se consulta para autenticar el login de staff**.
+4. `POST /auth/update-staff-password` (requiere JWT de admin) ahora recibe `{ "dni": "<11 dígitos>", "new_password": "..." }` y actualiza la contraseña del `User` staff real con ese DNI (debe existir, tener rol `STAFF` y estar activo). Ya no modifica `system_config.staff_password`, clave que quedó sin uso para el login tras F2-05.
+5. La cuenta compartida `dni="staff"` ya no existe: eliminar cualquier fila `users` con ese DNI y no recrearla. `POST /auth/login/staff` nunca crea filas de usuario.
+
+No se importa en `main.py` ni se ejecuta en el arranque: el bootstrap es siempre un paso explícito de despliegue.
+
 ## Entorno de desarrollo · Frontend
 
 Desde la raíz del repositorio:

@@ -55,62 +55,26 @@ async def login_staff(
     credentials: StaffLoginRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
-    """Staff login endpoint - authenticate staff and return access token with staff role.
-    
-    Rate limit: 3 requests per minute to prevent brute force attacks on admin accounts.
+    """Staff login endpoint - authenticate a real staff user and return access token.
+
+    Authenticates DNI + password against an existing, active User with role STAFF.
+    No account is created and system_config.staff_password is not consulted for
+    login. Any failure (unknown DNI, wrong password, inactive account, wrong role)
+    answers with the same generic 401 so there is no credential oracle.
+    Rate limit: 3 requests per minute to prevent brute force attacks.
     """
-    from sqlalchemy import select
-    from app.models.system_config import SystemConfig
-    from app.models.user import User
-    
-    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "staff_password"))
-    config = result.scalar_one_or_none()
-    
-    stored = config.value if config else None
-    
-    if not stored:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Staff authentication is not configured",
-        )
-    
-    if not _is_bcrypt_hash(stored):
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "Credenciales de staff en texto plano. Ejecutar "
-                "backend/scripts/hash_config_passwords.py para convertir "
-                "system_config a hash bcrypt antes de autenticar."
-            ),
-        )
-    
-    if not verify_password(credentials.password, stored):
+    auth_service = AuthService(db)
+
+    user = await auth_service.authenticate_staff(credentials.dni, credentials.password)
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # Get or create a real staff user in the database
-    result = await db.execute(select(User).where(User.dni == "staff"))
-    staff_user = result.scalar_one_or_none()
-    
-    if not staff_user:
-        staff_user = User(
-            dni="staff",
-            hashed_password=stored,
-            full_name="Personal Administrativo",
-            role=UserRole.STAFF,
-            is_active=True
-        )
-        db.add(staff_user)
-        await db.commit()
-        await db.refresh(staff_user)
-    
-    # Create token with staff role
-    access_token = create_access_token({"sub": staff_user.dni, "role": UserRole.STAFF.value})
-    
-    return Token(access_token=access_token, user=UserResponse.model_validate(staff_user))
+
+    access_token = auth_service.create_token(user)
+    return Token(access_token=access_token, user=UserResponse.model_validate(user))
 
 
 from app.schemas.security import AdminVerifyRequest, StaffPasswordUpdateRequest
@@ -166,23 +130,28 @@ async def update_staff_password(
     current_user: Annotated[User, Depends(require_role(["admin"]))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Update the staff password (requires admin authorization via JWT).
-    Rate limit: 3 requests per minute."""
-    # 2. Update staff password in database
+    """Update the password of a real staff user (requires admin JWT).
+
+    El admin indica el DNI de un staff existente y activo y la nueva
+    contraseña; se actualiza ese User. system_config.staff_password ya no se
+    usa para el login (F2-05), por tanto este endpoint no toca esa clave de
+    configuración. Rate limit: 3 requests per minute.
+    """
     from sqlalchemy import select
-    from app.models.system_config import SystemConfig
+    from app.models.user import User, UserRole
 
-    result = await db.execute(select(SystemConfig).where(SystemConfig.key == "staff_password"))
-    config = result.scalar_one_or_none()
+    result = await db.execute(select(User).where(User.dni == request_data.dni))
+    user = result.scalar_one_or_none()
 
-    if config:
-        config.value = get_password_hash(request_data.new_staff_password)
-    else:
-        config = SystemConfig(key="staff_password", value=get_password_hash(request_data.new_staff_password))
-        db.add(config)
+    if user is None or user.role != UserRole.STAFF or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario staff no encontrado",
+        )
 
+    user.hashed_password = get_password_hash(request_data.new_password)
     await db.commit()
-    return {"message": "Staff password updated successfully"}
+    return {"message": "Contraseña de personal actualizada correctamente"}
 
 
 @router.post("/users/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

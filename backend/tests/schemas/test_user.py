@@ -2,29 +2,38 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.user import StaffLoginRequest, UserCreate, UserResponse
+from app.schemas.auth import StaffLoginRequest
+from app.schemas.user import UserCreate, UserResponse
 from app.models.user import UserRole
 
 
 class TestStaffLoginRequest:
-    """Test StaffLoginRequest schema."""
-    
+    """Test StaffLoginRequest schema (F2-05: dni + password vs real STAFF user)."""
+
     def test_valid_staff_login_request(self):
-        """Test creating a valid StaffLoginRequest."""
-        data = {"password": "securepass123"}
+        """Test creating a valid StaffLoginRequest with DNI and password."""
+        data = {"dni": "12345678901", "password": "securepass123"}
         request = StaffLoginRequest(**data)
+        assert request.dni == "12345678901"
         assert request.password == "securepass123"
-    
-    def test_staff_login_request_with_short_password(self):
-        """Test StaffLoginRequest with password too short."""
-        data = {"password": "short"}
+
+    def test_staff_login_request_requires_dni(self):
+        """StaffLoginRequest requires a DNI."""
+        data = {"password": "securepass123"}
         with pytest.raises(ValidationError) as exc_info:
             StaffLoginRequest(**data)
-        assert "at least 6 characters" in str(exc_info.value)
-    
-    def test_staff_login_request_missing_password(self):
-        """Test StaffLoginRequest without password field."""
-        data = {}
+        assert "dni" in str(exc_info.value).lower()
+
+    def test_staff_login_request_rejects_bad_dni(self):
+        """StaffLoginRequest rejects DNIs that are not exactly 11 digits."""
+        for dni in ("12345", "123456789012", "1234567890a"):
+            data = {"dni": dni, "password": "securepass123"}
+            with pytest.raises(ValidationError):
+                StaffLoginRequest(**data)
+
+    def test_staff_login_request_requires_password(self):
+        """StaffLoginRequest requires a password."""
+        data = {"dni": "12345678901"}
         with pytest.raises(ValidationError) as exc_info:
             StaffLoginRequest(**data)
         assert "password" in str(exc_info.value).lower()
