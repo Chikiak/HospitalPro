@@ -108,3 +108,118 @@ async def test_alternated_rotation_before_anchor(test_db: AsyncSession):
 
     service = ScheduleService(test_db)
     assert service._is_schedule_active(category, datetime(2023, 12, 25)) is False
+
+
+@pytest.mark.asyncio
+async def test_is_bookable_slot_fixed_active(test_db: AsyncSession):
+    """is_bookable_slot devuelve True para un slot FIXED exacto y activo."""
+    target = next_future_day()
+    category = CategorySchedule(
+        category_type=CategoryType.SPECIALTY,
+        name="Cardiology",
+        day_of_week=target.weekday(),
+        start_time=time(9, 0),
+        turn_duration=30,
+        max_turns_per_block=4,
+        rotation_type=RotationType.FIXED,
+    )
+    test_db.add(category)
+    await test_db.commit()
+    await test_db.refresh(category)
+
+    service = ScheduleService(test_db)
+    slot = datetime.combine(target.date(), time(9, 0))
+    assert service.is_bookable_slot(category, slot) is True
+
+
+@pytest.mark.asyncio
+async def test_is_bookable_slot_rejects_non_exact_slot(test_db: AsyncSession):
+    """Una hora que no cae en una franja exacta (start_time + k*turn_duration) no es reservable."""
+    target = next_future_day()
+    category = CategorySchedule(
+        category_type=CategoryType.SPECIALTY,
+        name="Cardiology",
+        day_of_week=target.weekday(),
+        start_time=time(9, 0),
+        turn_duration=30,
+        max_turns_per_block=4,
+        rotation_type=RotationType.FIXED,
+    )
+    test_db.add(category)
+    await test_db.commit()
+    await test_db.refresh(category)
+
+    service = ScheduleService(test_db)
+    base = datetime.combine(target.date(), time(9, 0))
+    assert service.is_bookable_slot(category, base.replace(minute=25)) is False  # no es múltiplo de 30 min
+    assert service.is_bookable_slot(category, base.replace(hour=10, minute=5)) is False
+
+
+@pytest.mark.asyncio
+async def test_is_bookable_slot_rejects_wrong_weekday(test_db: AsyncSession):
+    """Un día de la semana distinto al configurado no es reservable."""
+    target = next_future_day()
+    category = CategorySchedule(
+        category_type=CategoryType.SPECIALTY,
+        name="Cardiology",
+        day_of_week=target.weekday(),
+        start_time=time(9, 0),
+        turn_duration=30,
+        max_turns_per_block=4,
+        rotation_type=RotationType.FIXED,
+    )
+    test_db.add(category)
+    await test_db.commit()
+    await test_db.refresh(category)
+
+    service = ScheduleService(test_db)
+    otro_dia = (target + timedelta(days=1)).replace(hour=9, minute=0)
+    assert service.is_bookable_slot(category, otro_dia) is False
+
+
+@pytest.mark.asyncio
+async def test_is_bookable_slot_alternated_inactive_week(test_db: AsyncSession):
+    """ALTERNATED rotation_weeks=2: semana 0 activa, semana 1 inactiva, semana 2 activa."""
+    anchor = datetime(2024, 1, 1).date()  # lunes
+    category = CategorySchedule(
+        category_type=CategoryType.LABORATORY,
+        name="Blood Test",
+        day_of_week=0,
+        start_time=time(8, 0),
+        turn_duration=15,
+        max_turns_per_block=3,
+        rotation_type=RotationType.ALTERNATED,
+        rotation_weeks=2,
+        start_date=anchor,
+    )
+    test_db.add(category)
+    await test_db.commit()
+    await test_db.refresh(category)
+
+    service = ScheduleService(test_db)
+    assert service.is_bookable_slot(category, datetime(2024, 1, 1, 8, 0)) is True   # semana 0
+    assert service.is_bookable_slot(category, datetime(2024, 1, 8, 8, 0)) is False  # semana 1 inactiva
+    assert service.is_bookable_slot(category, datetime(2024, 1, 15, 8, 0)) is True  # semana 2
+
+
+@pytest.mark.asyncio
+async def test_is_bookable_slot_before_start_date(test_db: AsyncSession):
+    """Una fecha anterior a start_date no es reservable aunque sea un weekday válido."""
+    start_date = datetime(2024, 6, 1).date()
+    category = CategorySchedule(
+        category_type=CategoryType.LABORATORY,
+        name="Blood Test",
+        day_of_week=start_date.weekday(),
+        start_time=time(8, 0),
+        turn_duration=15,
+        max_turns_per_block=3,
+        rotation_type=RotationType.ALTERNATED,
+        rotation_weeks=1,
+        start_date=start_date,
+    )
+    test_db.add(category)
+    await test_db.commit()
+    await test_db.refresh(category)
+
+    service = ScheduleService(test_db)
+    assert service.is_bookable_slot(category, datetime(2024, 5, 1, 8, 0)) is False  # antes del inicio

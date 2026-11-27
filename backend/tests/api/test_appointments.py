@@ -603,3 +603,151 @@ async def test_appointments_require_auth(client: AsyncClient, method: str, path:
     response = await client.request(method, path, **kwargs)
 
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_book_appointment_inactive_rotation_week_422(client: AsyncClient, test_db: AsyncSession, make_token):
+    """Slot en semana alternada INACTIVA (rotation_weeks=2, semana 1): 422 aunque sea futuro."""
+    dni = "PACIENTE_ROT1"
+    test_db.add(
+        User(dni=dni, hashed_password="hashed", full_name="Paciente Rot", role=UserRole.PATIENT, is_active=True)
+    )
+    await test_db.commit()
+
+    start_date = datetime.now().date()
+    target_weekday = datetime.now().weekday()
+    # Misma hora/día de semana, pero la semana siguiente (semana 1 -> inactiva con rotation_weeks=2)
+    inactive_date = (datetime.now() + timedelta(days=7)).replace(hour=9, minute=0, second=0, microsecond=0)
+
+    test_db.add(
+        CategorySchedule(
+            category_type=CategoryType.SPECIALTY,
+            name="Rotacion Inactiva",
+            day_of_week=target_weekday,
+            start_time=time(9, 0),
+            turn_duration=30,
+            max_turns_per_block=2,
+            rotation_type=RotationType.ALTERNATED,
+            rotation_weeks=2,
+            start_date=start_date,
+        )
+    )
+    await test_db.commit()
+
+    result = await test_db.execute(select(CategorySchedule).where(CategorySchedule.name == "Rotacion Inactiva"))
+    category = result.scalar_one()
+
+    token = make_token(dni=dni, role="patient")
+    response = await client.post(
+        "/appointments/book",
+        json={
+            "category_id": category.id,
+            "appointment_date": inactive_date.isoformat(),
+            "category_name": "Rotacion Inactiva",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test_book_appointment_before_start_date_422(client: AsyncClient, test_db: AsyncSession, make_token):
+    """Slot futuro pero anterior a start_date del calendario: 422 (calendario aún no activo)."""
+    dni = "PACIENTE_ROT2"
+    test_db.add(
+        User(dni=dni, hashed_password="hashed", full_name="Paciente Rot2", role=UserRole.PATIENT, is_active=True)
+    )
+    await test_db.commit()
+
+    start_date = (datetime.now() + timedelta(days=30)).date()  # empieza dentro de 30 días
+    target_weekday = datetime.now().weekday()
+    booking_date = (datetime.now() + timedelta(days=7)).replace(hour=9, minute=0, second=0, microsecond=0)
+    # booking_date es futuro, pero anterior a start_date -> calendario inactivo
+
+    test_db.add(
+        CategorySchedule(
+            category_type=CategoryType.SPECIALTY,
+            name="Rotacion Futura",
+            day_of_week=target_weekday,
+            start_time=time(9, 0),
+            turn_duration=30,
+            max_turns_per_block=2,
+            rotation_type=RotationType.ALTERNATED,
+            rotation_weeks=2,
+            start_date=start_date,
+        )
+    )
+    await test_db.commit()
+
+    result = await test_db.execute(select(CategorySchedule).where(CategorySchedule.name == "Rotacion Futura"))
+    category = result.scalar_one()
+
+    token = make_token(dni=dni, role="patient")
+    response = await client.post(
+        "/appointments/book",
+        json={
+            "category_id": category.id,
+            "appointment_date": booking_date.isoformat(),
+            "category_name": "Rotacion Futura",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test_book_appointment_specialty_same_day_another_hour_409(client: AsyncClient, test_db: AsyncSession, make_token):
+    """SPECIALTY: una cita activa por especialidad y día; segunda cita otro horario mismo día -> 409."""
+    dni_owner = "PACIENTE_SD1"
+    dni_other = "PACIENTE_SD2"
+    for dni, name in ((dni_owner, "Dueño"), (dni_other, "Otro")):
+        test_db.add(User(dni=dni, hashed_password="hashed", full_name=name, role=UserRole.PATIENT, is_active=True))
+    await test_db.commit()
+
+    target = datetime.now() + timedelta(days=7)
+    test_db.add(
+        CategorySchedule(
+            category_type=CategoryType.SPECIALTY,
+            name="Especialidad Unica",
+            day_of_week=target.weekday(),
+            start_time=time(9, 0),
+            turn_duration=30,
+            max_turns_per_block=4,
+            rotation_type=RotationType.FIXED,
+        )
+    )
+    await test_db.commit()
+
+    result = await test_db.execute(select(CategorySchedule).where(CategorySchedule.name == "Especialidad Unica"))
+    category = result.scalar_one()
+    result = await test_db.execute(select(User).where(User.dni == dni_owner))
+    owner = result.scalar_one()
+
+    slot1 = target.replace(hour=9, minute=0, second=0, microsecond=0)
+    slot2 = target.replace(hour=10, minute=0, second=0, microsecond=0)  # mismo día, otra hora
+
+    # El dueño ocupa el día (una cita por especialidad/día)
+    test_db.add(
+        Appointment(
+            patient_id=owner.id,
+            appointment_date=slot1,
+            specialty="Especialidad Unica",
+            status=AppointmentStatus.SCHEDULED,
+        )
+    )
+    await test_db.commit()
+
+    token = make_token(dni=dni_other, role="patient")
+    response = await client.post(
+        "/appointments/book",
+        json={
+            "category_id": category.id,
+            "appointment_date": slot2.isoformat(),
+            "category_name": "Especialidad Unica",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 409, response.text

@@ -165,27 +165,13 @@ async def book_appointment(
             detail="appointment_date must be in the future",
         )
 
-    # --- 4. appointment_date must fall on an exact schedule slot -----------
-    if appointment_date.weekday() != schedule.day_of_week:
-        raise HTTPException(
-            status_code=422,
-            detail="appointment_date does not fall on a scheduled day for this category",
-        )
-
-    is_lab = schedule.category_type == CategoryType.LABORATORY
-    slot_time = datetime.combine(appointment_date.date(), schedule.start_time)
-    matched = False
-    for _ in range(schedule.max_turns_per_block):
-        if schedule.deadline_time:
-            deadline_dt = datetime.combine(appointment_date.date(), schedule.deadline_time)
-            if slot_time >= deadline_dt:
-                break
-        if slot_time == appointment_date:
-            matched = True
-            break
-        if not is_lab:
-            slot_time = slot_time + timedelta(minutes=schedule.turn_duration)
-    if not matched:
+    # --- 4. appointment_date must fall on an exact, active schedule slot ----
+    # Reutiliza ScheduleService.is_bookable_slot (misma regla que alimenta
+    # GET /appointments/slots): día de la semana, rotación (rotation_type /
+    # start_date / rotation_weeks) y franja exacta (start_time + k*turn_duration
+    # respetando deadline_time).
+    schedule_service = ScheduleService(db)
+    if not schedule_service.is_bookable_slot(schedule, appointment_date):
         raise HTTPException(
             status_code=422,
             detail="appointment_date does not match an available slot for this category",
@@ -194,7 +180,11 @@ async def book_appointment(
     # --- 5. Write-time capacity protection (concurrency safe) --------------
     # SERIALIZABLE + row lock on the category schedule serializes concurrent
     # bookings for the same category. A serialization failure (40001) is
-    # retried; if the slot is already full we answer 409.
+    # retried; if the slot/day is already full we answer 409.
+    #
+    # La regla de escritura se alinea con ScheduleService._filter_occupied_slots:
+    # - SPECIALTY: una cita activa por especialidad y día (cualquier hora).
+    # - LABORATORY: hasta max_turns_per_block citas en la misma franja exacta.
     max_attempts = 3 if is_postgres else 1
     new_appointment = None
     for attempt in range(max_attempts):
@@ -207,20 +197,45 @@ async def book_appointment(
                 .with_for_update()
             )
 
-            # Count already-booked (active) appointments for this exact slot.
-            count_result = await db.execute(
-                select(func.count(Appointment.id)).where(
-                    and_(
-                        Appointment.specialty == schedule.name,
-                        Appointment.appointment_date == appointment_date,
-                        Appointment.status.in_(
-                            [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]
-                        ),
+            start_of_day = appointment_date.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            end_of_day = start_of_day + timedelta(days=1)
+
+            if schedule.category_type == CategoryType.SPECIALTY:
+                # Una cita activa por especialidad y día: si ya hay alguna,
+                # el día entero queda bloqueado (invariante de negocio).
+                booked_result = await db.execute(
+                    select(func.count(Appointment.id)).where(
+                        and_(
+                            Appointment.specialty == schedule.name,
+                            Appointment.appointment_date >= start_of_day,
+                            Appointment.appointment_date < end_of_day,
+                            Appointment.status.in_(
+                                [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]
+                            ),
+                        )
                     )
                 )
-            )
-            booked = count_result.scalar_one()
-            if booked >= schedule.max_turns_per_block:
+                booked = booked_result.scalar_one()
+                capacity = 1
+            else:
+                # LABORATORY: conteo por franja horaria exacta.
+                booked_result = await db.execute(
+                    select(func.count(Appointment.id)).where(
+                        and_(
+                            Appointment.specialty == schedule.name,
+                            Appointment.appointment_date == appointment_date,
+                            Appointment.status.in_(
+                                [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]
+                            ),
+                        )
+                    )
+                )
+                booked = booked_result.scalar_one()
+                capacity = schedule.max_turns_per_block
+
+            if booked >= capacity:
                 if is_postgres:
                     await db.rollback()
                 raise HTTPException(
@@ -242,8 +257,8 @@ async def book_appointment(
             # Commit succeeded: break out of the retry loop.
             break
         except HTTPException:
-            # 409 (full slot) propagates as-is; any open transaction is rolled
-            # back when the session is closed by the dependency.
+            # 409 (full slot/day) propagates as-is; any open transaction is
+            # rolled back when the session is closed by the dependency.
             raise
         except DBAPIError as exc:
             orig = getattr(exc, "orig", None)
