@@ -1,19 +1,16 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '../../lib/api'
-import { Calendar, Clock, Search } from 'lucide-react'
+import { Calendar, Search } from 'lucide-react'
 
 // Types
+// Nota: esta interfaz refleja el catálogo público /appointments/categories
+// (id, nombre y tipo). No expone la plantilla administrativa (horarios,
+// duración, rotación), que solo está en el protegido /admin/schedules.
 interface Category {
   id: number
   category_type: 'specialty' | 'laboratory'
   name: string
-  day_of_week: number
-  start_time: string
-  turn_duration: number
-  max_turns_per_block: number
-  rotation_type: 'fixed' | 'alternated'
-  rotation_weeks: number
 }
 
 interface TimeSlot {
@@ -27,39 +24,9 @@ const MAX_SLOTS_TO_DISPLAY = 3
 
 // Mock data for fallback
 const MOCK_CATEGORIES: Category[] = [
-  {
-    id: 1,
-    category_type: 'specialty',
-    name: 'Cardiología',
-    day_of_week: 1,
-    start_time: '09:00:00',
-    turn_duration: 30,
-    max_turns_per_block: 10,
-    rotation_type: 'fixed',
-    rotation_weeks: 1,
-  },
-  {
-    id: 2,
-    category_type: 'specialty',
-    name: 'Traumatología',
-    day_of_week: 2,
-    start_time: '10:00:00',
-    turn_duration: 30,
-    max_turns_per_block: 10,
-    rotation_type: 'fixed',
-    rotation_weeks: 1,
-  },
-  {
-    id: 3,
-    category_type: 'laboratory',
-    name: 'Análisis Clínicos',
-    day_of_week: 3,
-    start_time: '08:00:00',
-    turn_duration: 15,
-    max_turns_per_block: 20,
-    rotation_type: 'fixed',
-    rotation_weeks: 1,
-  },
+  { id: 1, category_type: 'specialty', name: 'Cardiología' },
+  { id: 2, category_type: 'specialty', name: 'Traumatología' },
+  { id: 3, category_type: 'laboratory', name: 'Análisis Clínicos' },
 ]
 
 const MOCK_SLOTS: TimeSlot[] = [
@@ -85,12 +52,14 @@ export default function AppointmentSearch() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
 
-  // Fetch categories
+  // Fetch categories desde el catálogo público (sin plantilla administrativa).
+  // Si falla (p. ej. 403 en entornos sin el endpoint público), cae a MOCK_CATEGORIES
+  // para no romper la reserva de pacientes.
   const { data: categories = MOCK_CATEGORIES } = useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: async () => {
       try {
-        const response = await api.get('/admin/schedules')
+        const response = await api.get('/appointments/categories')
         return Array.isArray(response.data) ? response.data : MOCK_CATEGORIES
       } catch (error) {
         console.warn('API not available, using mock data:', error)
@@ -280,12 +249,6 @@ export default function AppointmentSearch() {
                       <p className="text-base font-bold text-slate-900 group-hover:text-white transition-colors leading-tight">
                         {formatDateTime(slot.slot_datetime)}
                       </p>
-                    </div>
-                    <div className="flex items-center gap-2 py-2 px-3 bg-slate-50 rounded-lg group-hover:bg-white/10 transition-colors">
-                      <Clock className="h-4 w-4 text-slate-500 group-hover:text-white" />
-                      <span className="text-sm font-bold text-slate-700 group-hover:text-white">
-                        {selectedCategory.turn_duration} minutos
-                      </span>
                     </div>
                   </div>
                 </button>

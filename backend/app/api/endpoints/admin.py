@@ -5,7 +5,7 @@ from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import require_role
+from app.core.deps import get_current_user, require_role
 from app.core.rate_limit import limiter
 from app.models.category_schedule import CategorySchedule
 from app.models.user import User
@@ -101,18 +101,26 @@ async def create_or_update_schedule(
 
 
 @router.get("/schedules", response_model=List[CategoryScheduleResponse])
+@limiter.limit("10/minute")
 async def list_schedules(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    _: None = Depends(require_role(["admin", "staff", "doctor"])),
     db: Annotated[AsyncSession, Depends(get_db)] = None,
 ) -> List[CategoryScheduleResponse]:
     """
     List all category schedule configurations.
 
-    Public endpoint (no authentication required).
+    Requires an authenticated user with role admin, staff or doctor.
+    Patients (and any other role) receive 403. Unauthenticated requests
+    receive 401. Rate limit: 10 requests per minute.
 
     Returns all schedule blocks currently configured in the system,
     ordered by category_type and day_of_week for easy reading.
 
     Args:
+        request: HTTP request (for rate limiting)
+        current_user: Authenticated user
         db: Database session
 
     Returns:

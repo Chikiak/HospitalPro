@@ -27,11 +27,13 @@ export default function NewAppointment() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [selectedTurn, setSelectedTurn] = useState<TimeSlot | null>(null)
 
-  // Fetch all categories (schedules) to get the list of unique specialties/labs
+  // Fetch the public catalog of bookable categories (specialties/labs).
+  // Usa el endpoint público /appointments/categories en lugar de /admin/schedules,
+  // que ahora está protegido (403 para pacientes) y no expone la plantilla administrativa.
   const { data: allCategories = [], isLoading: catsLoading } = useQuery<Category[]>({
-    queryKey: ['admin-schedules'],
+    queryKey: ['appointment-categories'],
     queryFn: async () => {
-      const response = await api.get('/admin/schedules')
+      const response = await api.get('/appointments/categories')
       const data = response.data as Category[]
 
       // Deduplicate by name

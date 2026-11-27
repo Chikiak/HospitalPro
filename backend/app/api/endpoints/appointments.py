@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.appointment import Appointment, AppointmentStatus
+from app.models.category_schedule import CategorySchedule
 from app.models.user import User, UserRole
 from app.services.schedule_service import ScheduleService
 from app.schemas.appointment import (
@@ -16,6 +17,7 @@ from app.schemas.appointment import (
     BookAppointmentRequest,
     TimeSlotResponse,
 )
+from app.schemas.category_schedule import CategorySchedulePublic
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -42,6 +44,42 @@ async def get_slots(
             deadline_time=slot.deadline_time
         ) for slot in slots
     ]
+
+
+@router.get("/categories", response_model=List[CategorySchedulePublic])
+async def list_public_categories(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> List[CategorySchedulePublic]:
+    """
+    Public catalog of bookable categories (specialties and laboratories).
+
+    Returns only the identity fields (id, name, category_type) that patients
+    need to browse services. It deliberately does NOT expose the
+    administrative schedule template (start_time, turn_duration, rotation,
+    deadlines, warnings).
+
+    No authentication required. Rate limited by the default limit
+    (200 requests per minute).
+    """
+    query = select(CategorySchedule).order_by(
+        CategorySchedule.category_type,
+        CategorySchedule.name,
+        CategorySchedule.day_of_week,
+    )
+    result = await db.execute(query)
+    schedules = result.scalars().all()
+
+    # Un catálogo por categoría: deduplicar por nombre (un horario puede
+    # repetirse en varios días de la semana).
+    seen: set[str] = set()
+    public: List[CategorySchedulePublic] = []
+    for schedule in schedules:
+        if schedule.name in seen:
+            continue
+        seen.add(schedule.name)
+        public.append(CategorySchedulePublic.model_validate(schedule))
+
+    return public
 
 
 @router.get("/me", response_model=List[AppointmentResponse])
