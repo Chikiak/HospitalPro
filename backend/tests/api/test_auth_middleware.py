@@ -3,9 +3,10 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_access_token
+from app.core.security import create_access_token, get_password_hash
 from app.models.user import User, UserRole
 from app.repositories.allowed_person_repository import AllowedPersonRepository
+from app.repositories.user_repository import UserRepository
 
 
 @pytest.mark.asyncio
@@ -141,7 +142,10 @@ async def test_staff_can_access_all_patients(client: AsyncClient, test_db: Async
     """Test that staff can access all patient records."""
     # Create a patient
     allowed_repo = AllowedPersonRepository(test_db)
-    await allowed_repo.bulk_create([{"dni": "11111111111", "full_name": "Patient User"}])
+    await allowed_repo.bulk_create([
+        {"dni": "11111111111", "full_name": "Patient User"},
+        {"dni": "99999999999", "full_name": "Staff User"},
+    ])
     
     patient_response = await client.post(
         "/auth/users/register",
@@ -154,19 +158,19 @@ async def test_staff_can_access_all_patients(client: AsyncClient, test_db: Async
     )
     patient_id = patient_response.json()["id"]
     
-    # Create a staff user
-    staff_response = await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "99999999999",
-            "password": "staffpass123",
-            "full_name": "Staff User",
-            "role": "staff",
-        },
+    # Create a staff user directly in the DB (public registration forces PATIENT;
+    # staff accounts are provisioned out-of-band, not via public registration)
+    user_repo = UserRepository(test_db)
+    staff_user = await user_repo.create(
+        dni="99999999999",
+        hashed_password=get_password_hash("staffpass123"),
+        full_name="Staff User",
+        role=UserRole.STAFF,
     )
+    await test_db.commit()
     
     # Create token for staff
-    token = create_access_token({"sub": "99999999999", "role": "staff"})
+    token = create_access_token({"sub": staff_user.dni, "role": "staff"})
     headers = {"Authorization": f"Bearer {token}"}
     
     # Staff can access patient list

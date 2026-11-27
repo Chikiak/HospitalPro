@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "NODE_OPTIONS=--experimental-require-module vitest run"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -50,5 +50,9 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
     "vitest": "^4.0.17"
+  },
+  "overrides": {
+    "uuid": "^11.1.1",
+    "minimatch": "^5.0.0"
   }
 }

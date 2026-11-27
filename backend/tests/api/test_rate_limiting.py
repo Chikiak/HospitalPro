@@ -92,6 +92,14 @@ async def test_pdf_export_rate_limit_is_configured(client: AsyncClient, test_db:
         },
     )
     
+    # Ensure a medical record exists so the PDF endpoint can be exercised
+    from app.repositories.medical_record_repository import MedicalRecordRepository
+    medical_record_repo = MedicalRecordRepository(test_db)
+    await medical_record_repo.create(
+        patient_id=reg_response.json()["id"],
+        registration_survey={}
+    )
+    
     # Try to login (may be rate limited from other tests, which is OK)
     login_response = await client.post(
         "/auth/login/access-token",

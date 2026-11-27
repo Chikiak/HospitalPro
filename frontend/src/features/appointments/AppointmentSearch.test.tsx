@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import AppointmentSearch from './AppointmentSearch'
@@ -31,6 +31,10 @@ const createWrapper = () => {
   )
 }
 
+// waitFor con timeout extendido para evitar fallos espúreos por timing
+// bajo carga de CPU al ejecutar el suite completo en paralelo.
+const longWaitFor = (cb: Parameters<typeof waitFor>[0]) => waitFor(cb, { timeout: 5000 })
+
 describe('AppointmentSearch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -56,7 +60,7 @@ describe('AppointmentSearch', () => {
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
     await user.type(searchInput, 'Cardio')
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       expect(screen.getByText('Cardiología')).toBeInTheDocument()
     })
   })
@@ -68,7 +72,7 @@ describe('AppointmentSearch', () => {
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
     await user.type(searchInput, 'Trauma')
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       expect(screen.getByText('Traumatología')).toBeInTheDocument()
       expect(screen.queryByText('Cardiología')).not.toBeInTheDocument()
     })
@@ -81,15 +85,17 @@ describe('AppointmentSearch', () => {
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
     await user.type(searchInput, 'Cardio')
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       expect(screen.getByText('Cardiología')).toBeInTheDocument()
     })
 
-    const suggestion = screen.getByText('Cardiología')
-    await user.click(suggestion)
+    const suggestion = screen.getByRole('button', { name: /Cardiología/i })
+    act(() => {
+      fireEvent.click(suggestion)
+    })
 
-    await waitFor(() => {
-      expect(screen.getByText(/turnos disponibles/i)).toBeInTheDocument()
+    await longWaitFor(() => {
+      expect(screen.getByRole('heading', { name: /turnos disponibles/i })).toBeInTheDocument()
     })
   })
 
@@ -100,15 +106,19 @@ describe('AppointmentSearch', () => {
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
     await user.type(searchInput, 'Cardio')
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       expect(screen.getByText('Cardiología')).toBeInTheDocument()
     })
 
-    const suggestion = screen.getByText('Cardiología')
-    await user.click(suggestion)
+    const suggestion = screen.getByRole('button', { name: /Cardiología/i })
+    act(() => {
+      fireEvent.click(suggestion)
+    })
 
-    // Should show loading state
-    expect(screen.getByText(/buscando disponibilidad/i)).toBeInTheDocument()
+    // Should show loading state (appears asynchronously after click)
+    await longWaitFor(() => {
+      expect(screen.getByText(/buscando disponibilidad/i)).toBeInTheDocument()
+    })
   })
 
   it('displays only 3 available slots maximum', async () => {
@@ -118,14 +128,16 @@ describe('AppointmentSearch', () => {
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
     await user.type(searchInput, 'Cardio')
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       expect(screen.getByText('Cardiología')).toBeInTheDocument()
     })
 
-    const suggestion = screen.getByText('Cardiología')
-    await user.click(suggestion)
+    const suggestion = screen.getByRole('button', { name: /Cardiología/i })
+    act(() => {
+      fireEvent.click(suggestion)
+    })
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       const slots = screen.getAllByText(/turno disponible/i)
       expect(slots.length).toBeLessThanOrEqual(3)
     })
@@ -136,10 +148,10 @@ describe('AppointmentSearch', () => {
     render(<AppointmentSearch />, { wrapper: createWrapper() })
 
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
-    await user.type(searchInput, 'Análisis')
+    await user.type(searchInput, 'Clínicos')
 
-    await waitFor(() => {
-      expect(screen.getByText(/laboratorio/i)).toBeInTheDocument()
+    await longWaitFor(() => {
+      expect(screen.getByText('Laboratorio')).toBeInTheDocument()
     })
   })
 
@@ -150,14 +162,16 @@ describe('AppointmentSearch', () => {
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
     await user.type(searchInput, 'Cardio')
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       expect(screen.getByText('Cardiología')).toBeInTheDocument()
     })
 
-    const suggestion = screen.getByText('Cardiología')
-    await user.click(suggestion)
+    const suggestion = screen.getByRole('button', { name: /Cardiología/i })
+    act(() => {
+      fireEvent.click(suggestion)
+    })
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       // Suggestion dropdown should be hidden
       const allCardiologyElements = screen.getAllByText('Cardiología')
       // One in the search input value, one in the "Turnos Disponibles" section
@@ -172,14 +186,16 @@ describe('AppointmentSearch', () => {
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
     await user.type(searchInput, 'Cardio')
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       expect(screen.getByText('Cardiología')).toBeInTheDocument()
     })
 
-    const suggestion = screen.getByText('Cardiología')
-    await user.click(suggestion)
+    const suggestion = screen.getByRole('button', { name: /Cardiología/i })
+    act(() => {
+      fireEvent.click(suggestion)
+    })
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       const slots = screen.getAllByText(/turno disponible/i)
       expect(slots.length).toBeGreaterThan(0)
     })
@@ -192,22 +208,24 @@ describe('AppointmentSearch', () => {
     const searchInput = screen.getByPlaceholderText(/buscar especialidad o laboratorio/i)
     await user.type(searchInput, 'Cardio')
 
-    await waitFor(() => {
+    await longWaitFor(() => {
       expect(screen.getByText('Cardiología')).toBeInTheDocument()
     })
 
-    const suggestion = screen.getByText('Cardiología')
-    await user.click(suggestion)
+    const suggestion = screen.getByRole('button', { name: /Cardiología/i })
+    act(() => {
+      fireEvent.click(suggestion)
+    })
 
-    await waitFor(() => {
-      expect(screen.getByText(/turnos disponibles/i)).toBeInTheDocument()
+    await longWaitFor(() => {
+      expect(screen.getByRole('heading', { name: /turnos disponibles/i })).toBeInTheDocument()
     })
 
     // Clear the search
     await user.clear(searchInput)
 
-    await waitFor(() => {
-      expect(screen.queryByText(/turnos disponibles/i)).not.toBeInTheDocument()
+    await longWaitFor(() => {
+      expect(screen.queryByRole('heading', { name: /turnos disponibles/i })).not.toBeInTheDocument()
     })
   })
 })

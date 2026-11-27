@@ -2,7 +2,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_access_token
+from app.core.security import create_access_token, get_password_hash
+from app.models.user import UserRole
 from app.repositories.allowed_person_repository import AllowedPersonRepository
 from app.repositories.medical_record_repository import MedicalRecordRepository
 from app.repositories.user_repository import UserRepository
@@ -145,16 +146,15 @@ async def test_add_medical_record_entry_consultation(client: AsyncClient, test_d
     # Create auth token for staff to add entry
     staff_allowed_repo = AllowedPersonRepository(test_db)
     await staff_allowed_repo.bulk_create([{"dni": "98765432100", "full_name": "Staff User"}])
-    staff_register_response = await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "98765432100",
-            "password": "staffpassword123",
-            "full_name": "Staff User",
-            "role": "staff",
-        },
+    user_repo = UserRepository(test_db)
+    staff_user = await user_repo.create(
+        dni="98765432100",
+        hashed_password=get_password_hash("staffpassword123"),
+        full_name="Staff User",
+        role=UserRole.STAFF,
     )
-    staff_token = create_access_token({"sub": "98765432100", "role": "staff"})
+    await test_db.commit()
+    staff_token = create_access_token({"sub": staff_user.dni, "role": "staff"})
     staff_headers = {"Authorization": f"Bearer {staff_token}"}
     
     # Add consultation entry
@@ -203,16 +203,15 @@ async def test_add_medical_record_entry_lab_result(client: AsyncClient, test_db:
     # Create auth token for staff to add entry
     staff_allowed_repo = AllowedPersonRepository(test_db)
     await staff_allowed_repo.bulk_create([{"dni": "98765432100", "full_name": "Staff User"}])
-    staff_register_response = await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "98765432100",
-            "password": "staffpassword123",
-            "full_name": "Staff User",
-            "role": "staff",
-        },
+    user_repo = UserRepository(test_db)
+    staff_user = await user_repo.create(
+        dni="98765432100",
+        hashed_password=get_password_hash("staffpassword123"),
+        full_name="Staff User",
+        role=UserRole.STAFF,
     )
-    staff_token = create_access_token({"sub": "98765432100", "role": "staff"})
+    await test_db.commit()
+    staff_token = create_access_token({"sub": staff_user.dni, "role": "staff"})
     staff_headers = {"Authorization": f"Bearer {staff_token}"}
     
     # Add lab result entry
@@ -262,16 +261,15 @@ async def test_add_multiple_entries(client: AsyncClient, test_db: AsyncSession):
     # Create auth token for staff to add entries
     staff_allowed_repo = AllowedPersonRepository(test_db)
     await staff_allowed_repo.bulk_create([{"dni": "98765432100", "full_name": "Staff User"}])
-    staff_register_response = await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "98765432100",
-            "password": "staffpassword123",
-            "full_name": "Staff User",
-            "role": "staff",
-        },
+    user_repo = UserRepository(test_db)
+    staff_user = await user_repo.create(
+        dni="98765432100",
+        hashed_password=get_password_hash("staffpassword123"),
+        full_name="Staff User",
+        role=UserRole.STAFF,
     )
-    staff_token = create_access_token({"sub": "98765432100", "role": "staff"})
+    await test_db.commit()
+    staff_token = create_access_token({"sub": staff_user.dni, "role": "staff"})
     staff_headers = {"Authorization": f"Bearer {staff_token}"}
     
     # Add first entry
@@ -327,16 +325,15 @@ async def test_add_entry_to_nonexistent_medical_record(client: AsyncClient, test
     # Create auth token for staff
     staff_allowed_repo = AllowedPersonRepository(test_db)
     await staff_allowed_repo.bulk_create([{"dni": "98765432100", "full_name": "Staff User"}])
-    staff_register_response = await client.post(
-        "/auth/users/register",
-        json={
-            "dni": "98765432100",
-            "password": "staffpassword123",
-            "full_name": "Staff User",
-            "role": "staff",
-        },
+    user_repo = UserRepository(test_db)
+    staff_user = await user_repo.create(
+        dni="98765432100",
+        hashed_password=get_password_hash("staffpassword123"),
+        full_name="Staff User",
+        role=UserRole.STAFF,
     )
-    staff_token = create_access_token({"sub": "98765432100", "role": "staff"})
+    await test_db.commit()
+    staff_token = create_access_token({"sub": staff_user.dni, "role": "staff"})
     staff_headers = {"Authorization": f"Bearer {staff_token}"}
     
     # Try to add entry without creating medical record first

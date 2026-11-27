@@ -10,7 +10,7 @@ export default function AdminSettings() {
   const [adminPassword, setAdminPassword] = useState('')
   const [showAdminPrompt, setShowAdminPrompt] = useState(false)
   const [pendingAuthResolve, setPendingAuthResolve] = useState<((pass: string) => void) | null>(null)
-  const [pendingAuthReject, setPendingAuthReject] = useState<((reason?: any) => void) | null>(null)
+  const [pendingAuthReject, setPendingAuthReject] = useState<((reason?: unknown) => void) | null>(null)
 
   // Auth provider pattern for child components
   const requestAdminPassword = (): Promise<string> => {

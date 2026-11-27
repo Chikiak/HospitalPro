@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
@@ -21,10 +21,11 @@ class TriageData(Base):
     medical_history: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
     allergies: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     last_updated: Mapped[datetime] = mapped_column(
-        DateTime, 
-        nullable=False, 
-        server_default=func.timezone('UTC', func.now()),
-        onupdate=func.timezone('UTC', func.now())
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
     )
     
     # Relationship to User model

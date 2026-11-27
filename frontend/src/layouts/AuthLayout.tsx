@@ -1,6 +1,5 @@
 import { type ReactNode } from 'react'
 import { HeartPulse } from 'lucide-react'
-// @ts-ignore
 import loginBg from '../assets/login_bg.png'
 
 interface AuthLayoutProps {

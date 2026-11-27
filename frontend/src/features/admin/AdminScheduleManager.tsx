@@ -25,6 +25,21 @@ interface Category {
     schedules: Record<number, DaySchedule>
 }
 
+interface ScheduleItem {
+    id: number
+    name: string
+    category_type: string
+    day_of_week: number
+    start_time: string
+    turn_duration: number
+    max_turns_per_block: number
+    rotation_type: string
+    rotation_weeks: number
+    start_date?: string | null
+    deadline_time?: string | null
+    warning_message?: string | null
+}
+
 const DAYS = [
     { id: 0, label: 'Lunes' },
     { id: 1, label: 'Martes' },
@@ -45,22 +60,18 @@ export default function AdminScheduleManager({ adminPasswordProvider }: AdminSch
     const [newCategoryName, setNewCategoryName] = useState('')
     const [newCategoryType, setNewCategoryType] = useState<'specialty' | 'laboratory'>('specialty')
 
-    useEffect(() => {
-        fetchSchedules()
-    }, [])
-
     const fetchSchedules = async () => {
         try {
             const response = await api.get('/admin/schedules')
-            const data = response.data
+            const data = response.data as ScheduleItem[]
 
             // Transform flat list to grouped structure
             const grouped: Record<string, Category> = {}
-            data.forEach((item: any) => {
+            data.forEach((item) => {
                 if (!grouped[item.name]) {
                     grouped[item.name] = {
                         name: item.name,
-                        type: item.category_type,
+                        type: item.category_type as 'specialty' | 'laboratory',
                         schedules: {}
                     }
                 }
@@ -71,11 +82,11 @@ export default function AdminScheduleManager({ adminPasswordProvider }: AdminSch
                     start_time: item.start_time.substring(0, 5),
                     duration: item.turn_duration,
                     max_turns: item.max_turns_per_block,
-                    rotation_type: item.rotation_type,
+                    rotation_type: item.rotation_type as 'fixed' | 'alternated',
                     rotation_weeks: item.rotation_weeks,
-                    start_date: item.start_date,
-                    deadline_time: item.deadline_time?.substring(0, 5),
-                    warning_message: item.warning_message
+                    start_date: item.start_date ?? undefined,
+                    deadline_time: item.deadline_time ? item.deadline_time.substring(0, 5) : undefined,
+                    warning_message: item.warning_message ?? undefined
                 }
             })
 
@@ -84,6 +95,12 @@ export default function AdminScheduleManager({ adminPasswordProvider }: AdminSch
             console.error("Error fetching schedules", error)
         }
     }
+
+    useEffect(() => {
+        void (async () => {
+            await fetchSchedules()
+        })()
+    }, [])
 
     const handleCreateCategory = async () => {
         const nameToCreate = newCategoryType === 'laboratory' ? 'Laboratorio' : newCategoryName
@@ -135,7 +152,7 @@ export default function AdminScheduleManager({ adminPasswordProvider }: AdminSch
                     <select
                         className="w-full h-10 rounded-xl border-slate-200 bg-slate-50 text-sm font-medium"
                         value={newCategoryType}
-                        onChange={(e: any) => setNewCategoryType(e.target.value)}
+                        onChange={(e) => setNewCategoryType(e.target.value as 'specialty' | 'laboratory')}
                     >
                         <option value="specialty">Especialidad</option>
                         <option value="laboratory">Laboratorio</option>
@@ -370,7 +387,7 @@ function CategoryEditor({ category, onBack, adminPasswordProvider }: { category:
                                                 <select
                                                     className="w-full h-9 rounded-xl border-slate-200 bg-white text-xs font-bold text-slate-700"
                                                     value={schedule.rotation_type}
-                                                    onChange={(e) => updateDay(day.id, { rotation_type: e.target.value as any })}
+                                                    onChange={(e) => updateDay(day.id, { rotation_type: e.target.value as 'fixed' | 'alternated' })}
                                                 >
                                                     <option value="fixed">Semanal (Fijo)</option>
                                                     <option value="alternated">Alternado</option>
