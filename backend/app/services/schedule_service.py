@@ -146,6 +146,37 @@ class ScheduleService:
                 slot_time = slot_time + timedelta(minutes=category.turn_duration)
         
         return slots
+
+    def is_bookable_slot(self, category: CategorySchedule, appointment_date: datetime) -> bool:
+        """
+        Indica si ``appointment_date`` es un slot reservable para la categoría.
+
+        Reutiliza las mismas reglas que alimentan GET /appointments/slots:
+        - día de la semana coincide con CategorySchedule.day_of_week
+        - el calendario está activo según rotation_type / start_date / rotation_weeks
+        - la hora cae en una franja exacta (start_time + k*turn_duration)
+          respetando deadline_time
+        """
+        if appointment_date.weekday() != category.day_of_week:
+            return False
+
+        if not self._is_schedule_active(category, appointment_date):
+            return False
+
+        is_lab = category.category_type == CategoryType.LABORATORY
+        slot_time = datetime.combine(appointment_date.date(), category.start_time)
+
+        for _ in range(category.max_turns_per_block):
+            if category.deadline_time:
+                deadline_dt = datetime.combine(appointment_date.date(), category.deadline_time)
+                if slot_time >= deadline_dt:
+                    break
+            if slot_time == appointment_date:
+                return True
+            if not is_lab:
+                slot_time = slot_time + timedelta(minutes=category.turn_duration)
+
+        return False
     
     async def _filter_occupied_slots(
         self, 

@@ -2,14 +2,15 @@ from datetime import datetime, timedelta, date as dt_date
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.appointment import Appointment, AppointmentStatus
-from app.models.category_schedule import CategorySchedule
+from app.models.category_schedule import CategorySchedule, CategoryType
 from app.models.user import User, UserRole
 from app.services.schedule_service import ScheduleService
 from app.schemas.appointment import (
@@ -115,22 +116,166 @@ async def book_appointment(
 ) -> AppointmentResponse:
     """
     Book an appointment slot using the authenticated user.
+
+    Real validation (F2-03):
+    - category_id must reference an existing CategorySchedule (404 otherwise).
+    - category_name must match the schedule's name (422 otherwise).
+    - appointment_date must be in the future (422 otherwise).
+    - appointment_date must fall on an exact CategorySchedule slot
+      (day_of_week + start_time + k*turn_duration, honouring deadline_time) (422 otherwise).
+    - Capacity (max_turns_per_block) is enforced at write time inside a
+      PostgreSQL SERIALIZABLE transaction with SELECT ... FOR UPDATE, so the
+      invariant holds even under concurrent bookings (409 when full or on
+      serialization conflict).
+    Patients can only book their own appointment (patient_id = current_user).
     """
-    # Create the appointment using the provided data
-    # doctor_id is no longer stored (category/specialty based)
-    
-    new_appointment = Appointment(
-        patient_id=current_user.id,
-        appointment_date=booking.appointment_date,
-        specialty=booking.category_name,
-        notes=booking.notes,
-        status=AppointmentStatus.SCHEDULED,
+    # --- 0. Aislamiento de escritura ---------------------------------------
+    # En PostgreSQL se fuerza SERIALIZABLE a nivel de sesión (la sesión se
+    # cierra al terminar la request, sin fugar a otras peticiones) para que
+    # el bloqueo de fila + conteo de cupo proteja la invariante bajo
+    # concurrencia real. En otros dialectos (p. ej. SQLite en los tests) no
+    # se aplica; las escrituras van en la transacción implícita.
+    is_postgres = db.bind.dialect.name == "postgresql"
+    if is_postgres:
+        await db.execute(text("SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE"))
+
+    # --- 1. category_id must exist -----------------------------------------
+    result = await db.execute(
+        select(CategorySchedule).where(CategorySchedule.id == booking.category_id)
     )
-    
-    db.add(new_appointment)
-    await db.commit()
+    schedule = result.scalar_one_or_none()
+    if schedule is None:
+        raise HTTPException(status_code=404, detail="Category schedule not found")
+
+    # --- 2. category_name must match the schedule's name -------------------
+    if schedule.name != booking.category_name:
+        raise HTTPException(
+            status_code=422,
+            detail="category_name does not match category_id",
+        )
+
+    # --- 3. appointment_date must be in the future -------------------------
+    now = datetime.now()
+    appointment_date = booking.appointment_date
+    if appointment_date.tzinfo is not None:
+        appointment_date = appointment_date.replace(tzinfo=None)
+    if appointment_date <= now:
+        raise HTTPException(
+            status_code=422,
+            detail="appointment_date must be in the future",
+        )
+
+    # --- 4. appointment_date must fall on an exact, active schedule slot ----
+    # Reutiliza ScheduleService.is_bookable_slot (misma regla que alimenta
+    # GET /appointments/slots): día de la semana, rotación (rotation_type /
+    # start_date / rotation_weeks) y franja exacta (start_time + k*turn_duration
+    # respetando deadline_time).
+    schedule_service = ScheduleService(db)
+    if not schedule_service.is_bookable_slot(schedule, appointment_date):
+        raise HTTPException(
+            status_code=422,
+            detail="appointment_date does not match an available slot for this category",
+        )
+
+    # --- 5. Write-time capacity protection (concurrency safe) --------------
+    # SERIALIZABLE + row lock on the category schedule serializes concurrent
+    # bookings for the same category. A serialization failure (40001) is
+    # retried; if the slot/day is already full we answer 409.
+    #
+    # La regla de escritura se alinea con ScheduleService._filter_occupied_slots:
+    # - SPECIALTY: una cita activa por especialidad y día (cualquier hora).
+    # - LABORATORY: hasta max_turns_per_block citas en la misma franja exacta.
+    max_attempts = 3 if is_postgres else 1
+    new_appointment = None
+    for attempt in range(max_attempts):
+        try:
+            # Lock the category schedule row so concurrent bookings for the
+            # same category are serialized at write time.
+            await db.execute(
+                select(CategorySchedule)
+                .where(CategorySchedule.id == booking.category_id)
+                .with_for_update()
+            )
+
+            start_of_day = appointment_date.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            end_of_day = start_of_day + timedelta(days=1)
+
+            if schedule.category_type == CategoryType.SPECIALTY:
+                # Una cita activa por especialidad y día: si ya hay alguna,
+                # el día entero queda bloqueado (invariante de negocio).
+                booked_result = await db.execute(
+                    select(func.count(Appointment.id)).where(
+                        and_(
+                            Appointment.specialty == schedule.name,
+                            Appointment.appointment_date >= start_of_day,
+                            Appointment.appointment_date < end_of_day,
+                            Appointment.status.in_(
+                                [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]
+                            ),
+                        )
+                    )
+                )
+                booked = booked_result.scalar_one()
+                capacity = 1
+            else:
+                # LABORATORY: conteo por franja horaria exacta.
+                booked_result = await db.execute(
+                    select(func.count(Appointment.id)).where(
+                        and_(
+                            Appointment.specialty == schedule.name,
+                            Appointment.appointment_date == appointment_date,
+                            Appointment.status.in_(
+                                [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED]
+                            ),
+                        )
+                    )
+                )
+                booked = booked_result.scalar_one()
+                capacity = schedule.max_turns_per_block
+
+            if booked >= capacity:
+                if is_postgres:
+                    await db.rollback()
+                raise HTTPException(
+                    status_code=409,
+                    detail="No capacity left for this slot",
+                )
+
+            new_appointment = Appointment(
+                patient_id=current_user.id,
+                appointment_date=appointment_date,
+                specialty=booking.category_name,
+                notes=booking.notes,
+                status=AppointmentStatus.SCHEDULED,
+            )
+            db.add(new_appointment)
+            await db.flush()
+
+            await db.commit()
+            # Commit succeeded: break out of the retry loop.
+            break
+        except HTTPException:
+            # 409 (full slot/day) propagates as-is; any open transaction is
+            # rolled back when the session is closed by the dependency.
+            raise
+        except DBAPIError as exc:
+            orig = getattr(exc, "orig", None)
+            sqlstate = getattr(orig, "sqlstate", None)
+            # 40001 = serialization_failure: retry the transaction (PostgreSQL only).
+            if is_postgres and sqlstate == "40001":
+                await db.rollback()
+                if attempt == max_attempts - 1:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Concurrency conflict, please retry",
+                    )
+                continue
+            raise
+
     await db.refresh(new_appointment)
-    
+
     return AppointmentResponse(
         id=new_appointment.id,
         patient_id=new_appointment.patient_id,
