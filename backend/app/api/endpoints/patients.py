@@ -62,11 +62,15 @@ async def update_medical_history(
             )
         
         # Data Mapping: If medication_allergies is in medical_history, use it for top-level allergies if empty
+        # Pass None (not {}) when medical_history is not provided, so the repository does not overwrite an
+        # existing history with an empty dict when the client only updates allergies.
         medical_history = (
             data.medical_history.model_dump(exclude_none=True)
             if data.medical_history
-            else {}
+            else None
         )
+        if not medical_history:
+            medical_history = None
         allergies = data.allergies
         
         if not allergies and medical_history and "medication_allergies" in medical_history:

@@ -203,3 +203,69 @@ async def test_list_patients_without_medical_history(client: AsyncClient, test_d
     assert test_patient["full_name"] == "New Patient"
     assert test_patient["medical_history"] is None
     assert test_patient["allergies"] is None
+
+
+@pytest.mark.asyncio
+async def test_update_allergies_preserves_medical_history(client: AsyncClient, test_db: AsyncSession):
+    """Regression: updating only allergies must not erase existing medical_history."""
+    # Staff user
+    test_db.add(
+        User(
+            dni="99999999999",
+            hashed_password="hashed",
+            full_name="Staff User",
+            role=UserRole.STAFF,
+            is_active=True,
+        )
+    )
+    await test_db.commit()
+
+    # Allowed person + patient
+    allowed_repo = AllowedPersonRepository(test_db)
+    await allowed_repo.bulk_create([{"dni": "55555555555"}])
+
+    patient_response = await client.post(
+        "/auth/users/register",
+        json={
+            "dni": "55555555555",
+            "password": "testpassword123",
+            "full_name": "Test Patient",
+            "role": "patient",
+        },
+    )
+    assert patient_response.status_code == 201
+    patient_id = patient_response.json()["id"]
+
+    # Seed medical history via staff
+    staff_token = create_access_token({"sub": "99999999999", "role": "staff"})
+    staff_headers = {"Authorization": f"Bearer {staff_token}"}
+
+    await client.patch(
+        f"/patients/{patient_id}/medical-history",
+        json={
+            "medical_history": {
+                "chronic_diseases": "Diabetes",
+                "current_medications": "Metformin",
+            },
+            "allergies": "Penicillin",
+        },
+        headers=staff_headers,
+    )
+
+    # Update ONLY allergies (no medical_history key in payload)
+    await client.patch(
+        f"/patients/{patient_id}/medical-history",
+        json={"allergies": "Sulfonamides"},
+        headers=staff_headers,
+    )
+
+    # medical_history must be preserved
+    response = await client.get(
+        f"/patients/{patient_id}/medical-history", headers=staff_headers
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["allergies"] == "Sulfonamides"
+    assert data["medical_history"] is not None
+    assert data["medical_history"]["chronic_diseases"] == "Diabetes"
+    assert data["medical_history"]["current_medications"] == "Metformin"
