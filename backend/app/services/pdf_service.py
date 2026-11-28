@@ -86,13 +86,17 @@ async def generate_medical_record_pdf(patient_id: int, db: AsyncSession) -> Byte
     pdf.cell(0, 8, f'DNI: {patient.dni}', new_x='LMARGIN', new_y='NEXT')
     pdf.ln(5)
     
-    # Registration Survey
-    if medical_record.registration_survey:
+    # Registration Survey: los registros legacy pueden guardar
+    # registration_survey como un valor JSON no-dict (string/número/lista);
+    # la columna no restringe el tipo. No se asuma dict: un valor no-dict se
+    # trata como encuesta vacía y la sección se omite, en lugar de lanzar
+    # AttributeError y devolver 500 al descargar la historia clínica.
+    survey = medical_record.registration_survey
+    if isinstance(survey, dict) and survey:
         pdf.set_font(pdf._font_family, 'B', 14)
         pdf.cell(0, 10, 'Encuesta de Registro', new_x='LMARGIN', new_y='NEXT')
         pdf.set_font(pdf._font_family, '', 11)
         
-        survey = medical_record.registration_survey
         for key, value in survey.items():
             # Format key nicely
             formatted_key = key.replace('_', ' ').title()
