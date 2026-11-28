@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   useForm,
   type SubmitHandler,
@@ -20,6 +20,7 @@ import {
 import { Wizard, WizardProgressBar, WizardNavigation, useWizard } from './Wizard/WizardContext';
 import WizardStep from './Wizard/WizardStep';
 import { HeartPulse } from 'lucide-react';
+import { submitAdmission, type AdmissionPayload } from '../../../services/admissionService';
 
 const STORAGE_KEY = 'admission_form_draft';
 
@@ -388,7 +389,11 @@ const MedicalHistoryStep: React.FC<{
 };
 
 // Main Form Component
-const AdmissionFormContent: React.FC = () => {
+interface AdmissionFormContentProps {
+  formRef?: React.RefObject<HTMLFormElement | null>;
+}
+
+const AdmissionFormContent: React.FC<AdmissionFormContentProps> = ({ formRef }) => {
   const {
     register,
     handleSubmit,
@@ -453,11 +458,63 @@ const AdmissionFormContent: React.FC = () => {
     }
   }, [setValue]);
 
-  const onSubmit: SubmitHandler<AdmissionData> = (data) => {
-    console.log('Admission Form Data:', JSON.stringify(data, null, 2));
-    localStorage.removeItem(STORAGE_KEY);
-    alert('Formulario enviado exitosamente! Revisa la consola para ver los datos.');
-  };
+  // Estado del envío al servicio de admisión
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [submitMessage, setSubmitMessage] = useState('')
+
+  const onSubmit: SubmitHandler<AdmissionData> = async (data) => {
+    if (isSubmitting) {
+      // Previene el doble submit mientras un envío ya está en curso
+      return
+    }
+
+    setIsSubmitting(true)
+    setSubmitStatus('idle')
+    setSubmitMessage('')
+
+    try {
+      // Identificación del paciente mediante el flujo de auth ya existente:
+      // mismo patrón que RegisterStep2 (usuario guardado en localStorage).
+      const userStr = localStorage.getItem('user')
+      if (!userStr) {
+        setSubmitStatus('error')
+        setSubmitMessage('No se encontró información del usuario. Inicie sesión nuevamente.')
+        return
+      }
+
+      let user: { id?: number }
+      try {
+        user = JSON.parse(userStr)
+      } catch {
+        setSubmitStatus('error')
+        setSubmitMessage('Error al leer la información del usuario. Inicie sesión nuevamente.')
+        return
+      }
+
+      const userId = user?.id
+      if (!userId) {
+        setSubmitStatus('error')
+        setSubmitMessage('No se encontró el ID del usuario. Inicie sesión nuevamente.')
+        return
+      }
+
+      // Envío real al servicio de admisión: PATCH /patients/{patientId}/medical-history
+      // `currentMedications` es opcional en el esquema del form, pero en tiempo de ejecución
+      // siempre llega como string (defaultValues lo inicializa en '').
+      await submitAdmission(userId, data as AdmissionPayload)
+
+      setSubmitStatus('success')
+      // El borrador de localStorage solo se borra tras un éxito 200
+      localStorage.removeItem(STORAGE_KEY)
+    } catch (error) {
+      setSubmitStatus('error')
+      const err = error as { message?: string }
+      setSubmitMessage(err.message ?? 'No se pudo enviar la admisión. Intente nuevamente.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const handleSave = () => {
     const currentData = watch();
@@ -466,7 +523,22 @@ const AdmissionFormContent: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full">
+    <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="w-full">
+      {submitStatus === 'success' && (
+        <div className="bg-green-50 border border-green-200 text-green-800 rounded-lg px-4 py-3 mb-6">
+          Admisión enviada correctamente. Los datos se guardaron en el historial médico del paciente.
+        </div>
+      )}
+      {submitStatus === 'error' && (
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg px-4 py-3 mb-6">
+          {submitMessage}
+        </div>
+      )}
+      {isSubmitting && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-3 mb-6">
+          Enviando admisión al historial médico...
+        </div>
+      )}
       <WizardProgressBar className="mb-8" />
 
       <WizardStep
@@ -505,10 +577,14 @@ const AdmissionFormContent: React.FC = () => {
 
 // Wrapper Component
 const AdmissionForm: React.FC = () => {
+  const formRef = useRef<HTMLFormElement>(null)
+
   const handleComplete = () => {
-    // This function intentionally left empty as form submission is handled via handleSubmit
-    // The Wizard component calls this when the user clicks the final "Enviar" button
-    // which triggers the form's onSubmit handler
+    // El botón "Enviar" del wizard dispara el envío real del formulario:
+    // su onSubmit (react-hook-form) valida y envía los datos al servicio de admisión.
+    const form = formRef.current
+    if (!form) return
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
   };
 
   return (
@@ -528,7 +604,7 @@ const AdmissionForm: React.FC = () => {
           </p>
 
           <Wizard totalSteps={3} onComplete={handleComplete}>
-            <AdmissionFormContent />
+            <AdmissionFormContent formRef={formRef} />
           </Wizard>
         </div>
       </div>
