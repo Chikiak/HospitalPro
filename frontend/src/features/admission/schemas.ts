@@ -8,7 +8,9 @@ export const identificationSchema = z.object({
   firstName: z.string().min(2, 'Nombre debe tener al menos 2 caracteres'),
   lastName: z.string().min(2, 'Apellido debe tener al menos 2 caracteres'),
   dateOfBirth: z.string().min(1, 'Fecha de nacimiento es requerida'),
-  phone: z.string().min(10, 'Teléfono debe tener al menos 10 dígitos'),
+  phone: z.string()
+    .min(10, 'Teléfono debe tener al menos 10 dígitos')
+    .regex(/^[0-9]+$/, 'Teléfono debe contener solo dígitos'),
 });
 
 // Vitals Step Schema
@@ -39,7 +41,9 @@ export const medicalHistorySchema = z.object({
   allergies: z.array(z.string()).default([]),
   currentMedications: z.string().optional(),
   symptoms: z.string().min(10, 'Por favor describa los síntomas con más detalle'),
-  emergencyContact: z.string().min(10, 'Contacto de emergencia debe tener al menos 10 dígitos'),
+  emergencyContact: z.string()
+    .min(10, 'Contacto de emergencia debe tener al menos 10 dígitos')
+    .regex(/^[0-9]+$/, 'Contacto de emergencia debe contener solo dígitos'),
 });
 
 // Complete Admission Schema
