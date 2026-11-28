@@ -55,6 +55,26 @@ describe('AdmissionForm', () => {
       }, { timeout: 2000 });
     });
 
+    it('rechaza un teléfono con letras aunque tenga 10 caracteres', async () => {
+      const user = userEvent.setup();
+      render(<AdmissionForm />);
+
+      const nextButton = screen.getByRole('button', { name: /Siguiente/i });
+
+      // Datos válidos excepto el teléfono, que tiene 10 caracteres pero son letras
+      await user.type(screen.getByLabelText(/DNI/i), '12345678901');
+      await user.type(screen.getByLabelText(/Nombre/i), 'Juan');
+      await user.type(screen.getByLabelText(/Apellido/i), 'Pérez');
+      await user.type(screen.getByLabelText(/Fecha de Nacimiento/i), '1990-01-01');
+      await user.type(screen.getByLabelText(/Teléfono de Contacto/i), 'aaaaaaaaaa');
+
+      // El campo no es numérico: el formulario no debe permitir avanzar
+      await waitFor(() => {
+        expect(screen.getByText(/Teléfono debe contener solo dígitos/i)).toBeInTheDocument();
+      });
+      expect(nextButton).toBeDisabled();
+    });
+
     it('navigates to second step when "Next" is clicked', async () => {
       const user = userEvent.setup();
       render(<AdmissionForm />);
