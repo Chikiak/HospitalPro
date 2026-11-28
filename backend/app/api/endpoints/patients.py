@@ -66,7 +66,7 @@ async def update_medical_history(
         # existing history with an empty dict when the client only updates allergies.
         medical_history = (
             data.medical_history.model_dump(exclude_none=True)
-            if data.medical_history
+            if data.medical_history is not None
             else None
         )
         if not medical_history:
