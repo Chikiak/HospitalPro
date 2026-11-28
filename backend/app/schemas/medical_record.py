@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -121,6 +121,47 @@ class MedicalHistoryWrite(BaseModel):
     updated: Optional[bool] = Field(
         None, description="Update flag"
     )
+    phone: Optional[str] = Field(
+        None,
+        pattern=r"^\d{7,15}$",
+        max_length=15,
+        description="Teléfono de contacto del paciente",
+    )
+    emergency_contact: Optional[str] = Field(
+        None,
+        pattern=r"^\d{7,15}$",
+        max_length=15,
+        description="Teléfono de contacto de emergencia",
+    )
+    date_of_birth: Optional[str] = Field(
+        None, description="Fecha de nacimiento del paciente (ISO date, YYYY-MM-DD)"
+    )
+    vitals: Optional[dict[str, Any]] = Field(
+        None,
+        description="Signos vitales (temperatura, heart_rate, presión, saturación, peso)",
+    )
+
+    @field_validator("date_of_birth", mode="before")
+    @classmethod
+    def _validate_date_of_birth(cls, v: Any) -> Any:
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError("date_of_birth debe ser una fecha ISO (YYYY-MM-DD)")
+        try:
+            date.fromisoformat(v)
+        except ValueError:
+            raise ValueError("date_of_birth debe ser una fecha ISO válida (YYYY-MM-DD)")
+        return v
+
+    @field_validator("vitals")
+    @classmethod
+    def _validate_vitals_size(cls, v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+        if v is None:
+            return v
+        if len(json.dumps(v, ensure_ascii=False)) > _MAX_ENTRY_RESULTS_CHARS:
+            raise ValueError("vitals excede el tamaño máximo permitido")
+        return v
 
     @model_validator(mode="after")
     def _validate_total_size(self) -> "MedicalHistoryWrite":
