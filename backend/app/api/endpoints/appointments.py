@@ -463,7 +463,7 @@ async def export_patient_info(
             appointment.patient.full_name,
             appointment.specialty,
             appointment.appointment_date.strftime("%Y-%m-%d %H:%M"),
-            mh.get("chronic_diseases", "") if triage else "No registrado",
+            mh.get("chronic_diseases", "") if (triage and mh) else "No registrado",
             (
                 ", ".join(mh.get("medication_allergies", []))
                 if isinstance(mh.get("medication_allergies"), list)
@@ -471,7 +471,7 @@ async def export_patient_info(
             )
             if triage
             else "No registrado",
-            mh.get("other_information", "") if triage else "No registrado",
+            mh.get("other_information", "") if (triage and mh) else "No registrado",
         ],
     }
 
