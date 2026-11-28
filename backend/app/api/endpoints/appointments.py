@@ -441,17 +441,21 @@ async def export_patient_info(
     triage_result = await db.execute(triage_query)
     triage = triage_result.scalar_one_or_none()
 
+    # medical_history puede ser un valor legacy no-dict (string/número/lista) en
+    # registros antiguos: no asuma dict, de lo contrario .get() lanza
+    # AttributeError y el endpoint devuelve 500. Usar un dict vacío como fallback.
+    mh = triage.medical_history if (triage and isinstance(triage.medical_history, dict)) else {}
     # Prepare data for Excel
     data = {
         "Campo": [
-            "ID Paciente", 
-            "DNI", 
-            "Nombre Completo", 
-            "Especialidad del Turno", 
+            "ID Paciente",
+            "DNI",
+            "Nombre Completo",
+            "Especialidad del Turno",
             "Fecha del Turno",
             "Enfermedades Crónicas",
             "Alergias a Medicamentos",
-            "Otra Información"
+            "Otra Información",
         ],
         "Información": [
             appointment.patient.id,
@@ -459,10 +463,16 @@ async def export_patient_info(
             appointment.patient.full_name,
             appointment.specialty,
             appointment.appointment_date.strftime("%Y-%m-%d %H:%M"),
-            triage.medical_history.get("chronic_diseases", "") if triage and triage.medical_history else "No registrado",
-            ", ".join(triage.medical_history.get("medication_allergies", [])) if triage and triage.medical_history and isinstance(triage.medical_history.get("medication_allergies"), list) else (triage.allergies or "No registrado"),
-            triage.medical_history.get("other_information", "") if triage and triage.medical_history else "No registrado"
-        ]
+            mh.get("chronic_diseases", "") if (triage and mh) else "No registrado",
+            (
+                ", ".join(mh.get("medication_allergies", []))
+                if isinstance(mh.get("medication_allergies"), list)
+                else (triage.allergies or "No registrado")
+            )
+            if triage
+            else "No registrado",
+            mh.get("other_information", "") if (triage and mh) else "No registrado",
+        ],
     }
 
     df = pd.DataFrame(data)
