@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { HeartPulse, LayoutDashboard, Calendar, LogOut, Bell, Search, User } from 'lucide-react'
+import { HeartPulse, LayoutDashboard, Calendar, LogOut, Bell, Search, User, ClipboardList } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '../lib/utils'
 import { useAuth } from '../context/AuthContext'
@@ -16,6 +16,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const patientNav = [
     { label: 'Inicio', icon: LayoutDashboard, path: '/' },
     { label: 'Mis Turnos', icon: Calendar, path: '/appointments/new' },
+    { label: 'Admisión', icon: ClipboardList, path: '/admission' },
     { label: 'Perfil', icon: User, path: '/profile' },
   ]
 

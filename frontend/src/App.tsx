@@ -12,6 +12,7 @@ import AdminSettings from './pages/AdminSettings'
 import MainLayout from './layouts/MainLayout'
 import StaffCalendar from './pages/admin/StaffCalendar'
 import AppointmentSearch from './features/appointments/AppointmentSearch'
+import AdmissionForm from './features/admission/components/AdmissionForm'
 
 function App() {
   return (
@@ -116,6 +117,18 @@ function App() {
               <RoleGuard allowedRoles={['patient']}>
                 <MainLayout>
                   <Profile />
+                </MainLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* Private route - Patient admission form (triaje digital) */}
+          <Route
+            path="/admission"
+            element={
+              <RoleGuard allowedRoles={['patient']}>
+                <MainLayout>
+                  <AdmissionForm />
                 </MainLayout>
               </RoleGuard>
             }
