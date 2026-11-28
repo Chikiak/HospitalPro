@@ -6,7 +6,6 @@ test isolation issues. Each test can be run individually to verify
 the specific rate limit behavior.
 """
 
-import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
@@ -371,16 +370,24 @@ async def test_book_counter_reset(client: AsyncClient, test_db: AsyncSession):
 
 @asynccontextmanager
 async def _async_client_with_ip(test_db: AsyncSession, ip: str):
-    """AsyncClient cuyo request.client.host es `ip` (IP de conexión real)."""
+    """AsyncClient cuyo request.client.host es `ip` (IP de conexión real).
+
+    El override de `get_db` se retira siempre en `finally`: si una aserción
+    falla dentro del bloque, sin él el override quedaría instalado apuntando a
+    la sesión de este test (ya cerrada) y contaminaría los siguientes,
+    enmascarando el fallo real con errores 500 encadenados.
+    """
 
     async def override_get_db():
         yield test_db
 
     app.dependency_overrides[get_db] = override_get_db
-    transport = httpx.ASGITransport(app=app, client=(ip, 1234))
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-    app.dependency_overrides.pop(get_db, None)
+    try:
+        transport = httpx.ASGITransport(app=app, client=(ip, 1234))
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.mark.asyncio
