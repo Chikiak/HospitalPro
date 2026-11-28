@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { useState, useEffect } from 'react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { useState } from 'react'
 import MockAdapter from 'axios-mock-adapter'
 import api from '../lib/api'
 import { AuthProvider, useAuth } from './AuthContext'
 
 let mock: MockAdapter
 
-let originalLocation: string
+// Referencia completa del objeto window.location original (no solo su href).
+const originalLocation = window.location
 
 function AuthStatus() {
   const { user, isAuthenticated } = useAuth()
@@ -20,16 +21,25 @@ function AuthStatus() {
 }
 
 // Dispara una petición que termina en 401 y expone el estado recibido.
+// El disparo lo provoca el usuario mediante un botón (no un useEffect al montar),
+// así el test comprueba primero el estado autenticado y luego la transición.
 function TriggerUnauthorized() {
   const [status, setStatus] = useState<string>('idle')
 
-  useEffect(() => {
+  const trigger = () => {
     api.get('/appointments/categories').catch((err) => {
       setStatus(String(err.response?.status ?? 'unknown'))
     })
-  }, [])
+  }
 
-  return <div data-testid="trigger-status">{status}</div>
+  return (
+    <div>
+      <button type="button" onClick={trigger} data-testid="trigger-btn">
+        Disparar 401
+      </button>
+      <div data-testid="trigger-status">{status}</div>
+    </div>
+  )
 }
 
 beforeEach(() => {
@@ -37,19 +47,20 @@ beforeEach(() => {
   localStorage.clear()
 
   // Se anula la navegación real del interceptor (como en lib/api.test.ts)
-  originalLocation = window.location.href
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  delete (window as any).location
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  window.location = { href: '', pathname: '/dashboard' } as any
+  Object.defineProperty(window, 'location', {
+    value: { href: '', pathname: '/dashboard' },
+    writable: true,
+    configurable: true,
+  })
 })
 
 afterEach(() => {
   mock.restore()
   localStorage.clear()
   Object.defineProperty(window, 'location', {
-    value: { href: originalLocation },
+    value: originalLocation,
     writable: true,
+    configurable: true,
   })
 })
 
@@ -70,7 +81,12 @@ describe('AuthContext - sincronización de estado ante 401', () => {
       </AuthProvider>,
     )
 
-    // La petición disparada efectivamente recibe 401
+    // Estado inicial: autenticado antes de disparar nada
+    expect(screen.getByTestId('is-authenticated')).toHaveTextContent('true')
+    expect(screen.getByTestId('user-dni')).toHaveTextContent('12345678')
+
+    // Disparar el 401 y esperar la transición determinista
+    fireEvent.click(screen.getByTestId('trigger-btn'))
     await waitFor(() => expect(screen.getByTestId('trigger-status')).toHaveTextContent('401'))
 
     // El estado de React se vació junto con localStorage
@@ -79,7 +95,7 @@ describe('AuthContext - sincronización de estado ante 401', () => {
     expect(localStorage.getItem('access_token')).toBeNull()
     expect(localStorage.getItem('user')).toBeNull()
 
-    // El interceptor mantiene su redirección a login (no estaba en /login)
+    // El interceptor redirige a login (no estaba en /login)
     expect(window.location.href).toBe('/login')
   })
 
@@ -99,10 +115,19 @@ describe('AuthContext - sincronización de estado ante 401', () => {
       </AuthProvider>,
     )
 
+    // Estado inicial: autenticado antes de disparar nada
+    expect(screen.getByTestId('is-authenticated')).toHaveTextContent('true')
+    expect(screen.getByTestId('user-dni')).toHaveTextContent('12345678')
+
+    // Disparar el 401 y esperar la transición determinista
+    fireEvent.click(screen.getByTestId('trigger-btn'))
     await waitFor(() => expect(screen.getByTestId('trigger-status')).toHaveTextContent('401'))
     await waitFor(() => expect(screen.getByTestId('is-authenticated')).toHaveTextContent('false'))
     expect(screen.getByTestId('user-dni')).toHaveTextContent('null')
     expect(localStorage.getItem('access_token')).toBeNull()
     expect(localStorage.getItem('user')).toBeNull()
+
+    // El interceptor no cambió window.location.href al estar en /login
+    expect(window.location.href).toBe('')
   })
 })
