@@ -308,3 +308,61 @@ async def test_f206_generic_errors_still_generic(client, test_db):
         )
     assert response.status_code == 500
     assert response.json()["detail"] == "Error interno del servidor"
+
+
+@pytest.mark.asyncio
+async def test_medical_history_accepts_admission_keys_round_trip(client, test_db):
+    """Las claves de admisión (phone, emergency_contact, date_of_birth, vitals) se escriben y leen igual."""
+    patient_id, headers = await _create_patient(client, test_db, "70000000010")
+
+    payload = {
+        "medical_history": {
+            "phone": "3001234567",
+            "emergency_contact": "3009876543",
+            "date_of_birth": "1985-04-12",
+            "vitals": {"temperatura": "36.5", "heart_rate": "72"},
+        },
+    }
+
+    response = await client.patch(
+        f"/patients/{patient_id}/medical-history",
+        json=payload,
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+
+    # Round-trip: leer y verificar que se devuelve lo escrito.
+    get_resp = await client.get(
+        f"/patients/{patient_id}/medical-history", headers=headers
+    )
+    assert get_resp.status_code == 200
+    data = get_resp.json()
+    mh = data["medical_history"]
+    assert mh["phone"] == "3001234567"
+    assert mh["emergency_contact"] == "3009876543"
+    assert mh["date_of_birth"] == "1985-04-12"
+    assert mh["vitals"] == {"temperatura": "36.5", "heart_rate": "72"}
+
+
+@pytest.mark.asyncio
+async def test_medical_history_rejects_admission_unknown_key(client, test_db):
+    """Una clave desconocida junto a claves de admisión válidas da 422 y no escribe."""
+    patient_id, headers = await _create_patient(client, test_db, "70000000011")
+
+    response = await client.patch(
+        f"/patients/{patient_id}/medical-history",
+        json={
+            "medical_history": {
+                "phone": "3001234567",
+                "clave_inexistente_admision": "debería rechazarse",
+            }
+        },
+        headers=headers,
+    )
+    assert response.status_code == 422, response.text
+
+    # Nada se escribió.
+    get_resp = await client.get(
+        f"/patients/{patient_id}/medical-history", headers=headers
+    )
+    assert get_resp.status_code == 404

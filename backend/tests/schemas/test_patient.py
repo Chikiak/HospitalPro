@@ -2,6 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
+from app.schemas.medical_record import MedicalHistoryWrite
 from app.schemas.patient import (
     PatientCreate,
     TriageUpdate,
@@ -149,3 +150,51 @@ class TestTriageDataUpdate:
         triage_data = TriageDataUpdate(**data)
         assert triage_data.medical_history.model_dump(exclude_none=True) == data["medical_history"]
         assert triage_data.allergies == "none"
+
+
+class TestMedicalHistoryWrite:
+    """Test MedicalHistoryWrite schema (admission whitelist extension, PR 1)."""
+
+    def test_accepts_admission_fields(self):
+        """MedicalHistoryWrite acepta phone, emergency_contact, date_of_birth y vitals."""
+        data = {
+            "phone": "3001234567",
+            "emergency_contact": "3009876543",
+            "date_of_birth": "1985-04-12",
+            "vitals": {"temperatura": "36.5", "heart_rate": "72"},
+        }
+        mh = MedicalHistoryWrite(**data)
+        dump = mh.model_dump(exclude_none=True)
+        assert dump["phone"] == "3001234567"
+        assert dump["emergency_contact"] == "3009876543"
+        assert dump["date_of_birth"] == "1985-04-12"
+        assert dump["vitals"] == {"temperatura": "36.5", "heart_rate": "72"}
+
+    def test_rejects_unknown_key(self):
+        """Una clave desconocida sigue siendo rechazada (extra=forbid)."""
+        with pytest.raises(ValidationError) as exc_info:
+            MedicalHistoryWrite(campo_inexistente="x")
+        assert "extra_forbidden" in str(exc_info.value) or "Extra inputs are not permitted" in str(exc_info.value)
+
+    def test_rejects_invalid_date_of_birth(self):
+        """date_of_birth debe ser una fecha ISO válida."""
+        with pytest.raises(ValidationError):
+            MedicalHistoryWrite(date_of_birth="not-a-date")
+
+    def test_rejects_phone_wrong_pattern(self):
+        """phone debe cumplir el patrón de solo dígitos (7-15)."""
+        with pytest.raises(ValidationError):
+            MedicalHistoryWrite(phone="abc")
+        with pytest.raises(ValidationError):
+            MedicalHistoryWrite(phone="12")  # muy corto
+
+    @pytest.mark.parametrize("phone", ["3001234567", "1234567", "30012345678901"])
+    def test_accepts_valid_phone(self, phone):
+        """Teléfonos de 7 a 15 dígitos son válidos."""
+        mh = MedicalHistoryWrite(phone=phone)
+        assert mh.phone == phone
+
+    def test_allows_none_for_all_fields(self):
+        """Todos los campos son opcionales."""
+        mh = MedicalHistoryWrite()
+        assert mh.model_dump(exclude_none=True) == {}
