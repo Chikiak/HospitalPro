@@ -1,6 +1,6 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import type { ReactNode } from 'react'
-import api from '../lib/api'
+import api, { setUnauthorizedHandler } from '../lib/api'
 
 interface User {
   id: number
@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = () => {
+  const logout = useCallback(() => {
     // Clear all localStorage items
     localStorage.removeItem('access_token')
     localStorage.removeItem('user')
@@ -143,7 +143,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     // Reset loading state
     setIsLoading(false)
-  }
+  }, [])
+
+  // Cuando el interceptor de api detecta un 401, el token ya se borró de
+  // localStorage; este handler vacía el estado de React para que la app no
+  // siga actuando como autenticada sin token (evita rutas protegidas huérfanas
+  // y bucle de 401 hasta recargar la página).
+  const handleUnauthorized = useCallback(() => {
+    logout()
+  }, [logout])
+
+  useEffect(() => {
+    // setUnauthorizedHandler es estable a nivel de módulo: no hace falta depender de ella
+    setUnauthorizedHandler(handleUnauthorized)
+    return () => {
+      setUnauthorizedHandler(null)
+    }
+  }, [handleUnauthorized])
 
   const value = {
     user,
